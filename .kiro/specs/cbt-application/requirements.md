@@ -2,7 +2,7 @@
 
 ## Introduction
 
-The Computer-Based Test (CBT) Application is a comprehensive testing platform built with the MERN stack that enables test center owners to create and manage tests while allowing students to take these tests in a controlled environment. The application features a hybrid architecture with local server components for secure test administration and online components for management and configuration. The system supports multimedia questions (text, audio, images) with multiple-choice answers, including questions that may have multiple correct answers.
+The Computer-Based Test (CBT) Application is a comprehensive testing platform built with the MERN stack that enables test center owners to create and manage tests while allowing students to take these tests in a controlled environment. The application features a monolithic architecture with a single unified backend server that handles all business logic and can be deployed both online for management and locally for secure test administration. The system supports multimedia questions (text, audio, images) with multiple-choice answers, including questions that may have multiple correct answers.
 
 ## Requirements
 

@@ -2,12 +2,13 @@
 
 ## Overview
 
-The Computer-Based Test (CBT) Application is designed as a hybrid MERN stack application with both online and local server components. The architecture ensures secure test administration while providing flexible management capabilities. The system supports multimedia questions with rich text editing and Excel-based bulk uploads.
+The Computer-Based Test (CBT) Application is designed as a MERN stack monolithic application with a single unified backend server that handles all business logic. The application can be deployed both online for management and locally for secure test administration. The monolithic architecture ensures secure test administration while providing flexible management capabilities with simplified deployment and maintenance. The system supports multimedia questions with rich text editing and Excel-based bulk uploads.
 
 ### Key Design Principles
 
-- **Hybrid Architecture**: Online components for management, local components for secure test delivery
-- **Data Synchronization**: Seamless sync between online and local databases
+- **Monolithic Architecture**: Single unified backend server containing all business logic modules (auth, user management, test management, media processing, analytics, subscriptions)
+- **Modular Monolith**: Well-organized internal modules with clear boundaries while maintaining single deployment unit
+- **Data Synchronization**: Seamless sync between online and local database instances
 - **Multimedia Optimization**: Local storage of media files with size optimization
 - **Security First**: Secure test environment with anti-cheating measures
 - **User Experience**: Intuitive interfaces for all user roles
@@ -341,36 +342,44 @@ class ConfigurationService {
 graph TB
     subgraph "Online Cloud Infrastructure"
         LB[Load Balancer - NGINX]
-        AG[API Gateway]
 
-        subgraph "Microservices"
-            AUTH[Auth Service]
-            USER[User Service]
-            TEST[Test Service + Media Storage]
-            MEDIA_PROC[Media Processing Service]
-            SUBSCRIPTION[Subscription Service]
-            SYNC[Sync Service]
-            ANALYTICS[Analytics Service]
+        subgraph "Monolithic Backend Server"
+            BACKEND[CBT Backend Server - Express.js]
+            subgraph "Internal Modules"
+                AUTH_M[Auth Module]
+                USER_M[User Management Module]
+                TEST_M[Test Management Module]
+                MEDIA_M[Media Processing Module]
+                SUB_M[Subscription Module]
+                SYNC_M[Sync Module]
+                ANALYTICS_M[Analytics Module]
+                QUESTION_M[Question Bank Module]
+            end
         end
 
         OW[Online Web App - React]
         REDIS[(Redis Cache)]
         ODB[(MongoDB Atlas)]
         CDN[CDN - Static Assets]
+        FS_ONLINE[File System - Media Storage]
     end
 
     subgraph "Local Server Infrastructure"
-        subgraph "Local Services"
-            L_AUTH[Local Auth Service]
-            L_TEST[Local Test Service + Media Storage]
-            L_MEDIA_PROC[Local Media Processing Service]
-            L_SYNC[Local Sync Service]
+        subgraph "Local Monolithic Backend Server"
+            L_BACKEND[Local CBT Backend Server - Express.js]
+            subgraph "Local Internal Modules"
+                L_AUTH_M[Local Auth Module]
+                L_TEST_M[Local Test Module]
+                L_MEDIA_M[Local Media Module]
+                L_SYNC_M[Local Sync Module]
+                L_QUESTION_M[Local Question Bank Module]
+            end
         end
 
         LW[Local Web App - React]
         L_REDIS[(Local Redis)]
         LDB[(Local MongoDB)]
-        FS[File System - Media Storage]
+        FS_LOCAL[File System - Media Storage]
     end
 
     subgraph "Client Devices"
@@ -384,47 +393,29 @@ graph TB
         ELK[ELK Stack]
     end
 
-    LB --> AG
-    AG --> AUTH
-    AG --> USER
-    AG --> TEST
-    AG --> SUBSCRIPTION
-    AG --> SYNC
-    AG --> ANALYTICS
-
-    TEST --> MEDIA_PROC
-    TEST --> SUBSCRIPTION
-
+    LB --> BACKEND
     OW --> LB
-    AUTH --> REDIS
-    USER --> ODB
-    TEST --> ODB
-    TEST --> CDN
-    SUBSCRIPTION --> ODB
-    SYNC --> ODB
-    ANALYTICS --> ODB
 
-    LW --> L_AUTH
-    LW --> L_TEST
-    L_AUTH --> L_REDIS
-    L_TEST --> LDB
-    L_TEST --> FS
-    L_TEST --> L_MEDIA_PROC
-    L_MEDIA_PROC --> FS
-    L_SYNC --> LDB
+    BACKEND --> REDIS
+    BACKEND --> ODB
+    BACKEND --> CDN
+    BACKEND --> FS_ONLINE
+
+    LW --> L_BACKEND
+    L_BACKEND --> L_REDIS
+    L_BACKEND --> LDB
+    L_BACKEND --> FS_LOCAL
 
     TC --> OW
     TC --> LW
     ST --> LW
 
-    SYNC <--> L_SYNC
+    SYNC_M <--> L_SYNC_M
     ODB <--> LDB
 
-    AUTH --> PROM
-    TEST --> PROM
+    BACKEND --> PROM
     PROM --> GRAF
-    AUTH --> ELK
-    TEST --> ELK
+    BACKEND --> ELK
 ```
 
 ### Technology Stack
@@ -441,16 +432,17 @@ graph TB
 - React Hook Form for form management and validation
 - Docker containerization for consistent deployment
 
-**Backend Microservices (Node.js/Express)**
+**Backend Monolith (Node.js/Express)**
 
-- **API Gateway**: Express.js with rate limiting and request routing
-- **Authentication Service**: JWT with refresh tokens, OAuth integration
-- **Test Management Service**: Test CRUD operations, media storage/serving, and validation
-- **Media Processing Service**: Background processing for image/audio optimization and format conversion
-- **User Management Service**: User registration, roles, and permissions
-- **Subscription Service**: Tier management, payment processing, and usage tracking
-- **Sync Service**: Data synchronization between online and local systems
-- **Analytics Service**: Test results processing and reporting
+- **Single Express.js Application**: Unified monolithic server with modular internal structure
+- **Authentication Module**: JWT with refresh tokens, OAuth integration, user session management
+- **Test Management Module**: Test CRUD operations, media storage/serving, validation, and question bank management
+- **Media Processing Module**: Background processing for image/audio optimization and format conversion
+- **User Management Module**: User registration, roles, permissions, and test center management
+- **Subscription Module**: Tier management, payment processing, usage tracking, and limits enforcement
+- **Sync Module**: Data synchronization between online and local instances with conflict resolution
+- **Analytics Module**: Test results processing, reporting, and performance analytics
+- **Question Bank Module**: Subject organization, question reuse, and auto-selection functionality
 
 **Caching & Performance**
 
@@ -539,61 +531,69 @@ services:
 version: "3.8"
 services:
   # Frontend
-  web-app:
+  frontend:
     build: ./frontend
     ports: ["3000:3000"]
     environment:
-      - REACT_APP_API_URL=http://api-gateway:4000
+      - REACT_APP_API_URL=http://backend:4000
 
-  # API Gateway
-  api-gateway:
-    build: ./api-gateway
+  # Monolithic Backend Server
+  backend:
+    build: ./backend
     ports: ["4000:4000"]
-    depends_on: [redis, auth-service, test-service]
-
-  # Microservices
-  auth-service:
-    build: ./services/auth
+    depends_on: [redis, mongo]
     environment:
+      - NODE_ENV=production
+      - PORT=4000
       - REDIS_URL=redis://redis:6379
-      - MONGODB_URL=mongodb://mongo:27017/cbt_auth
-
-  test-service:
-    build: ./services/test
-    environment:
-      - MONGODB_URL=mongodb://mongo:27017/cbt_tests
-      - REDIS_URL=redis://redis:6379
-      - MEDIA_PROCESSING_URL=http://media-processing:5000
-    volumes: ["./media:/app/uploads"]
-
-  media-processing:
-    build: ./services/media-processing
-    environment:
-      - REDIS_URL=redis://redis:6379
-    volumes: ["./media:/app/media"]
-
-  subscription-service:
-    build: ./services/subscription
-    environment:
-      - MONGODB_URL=mongodb://mongo:27017/cbt_subscriptions
-      - REDIS_URL=redis://redis:6379
+      - MONGODB_URL=mongodb://mongo:27017/cbt_app
       - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
       - PAYPAL_CLIENT_ID=${PAYPAL_CLIENT_ID}
+      - JWT_SECRET=${JWT_SECRET}
+    volumes: ["./media:/app/uploads"]
 
-  # Infrastructure
+  # Local Server (same monolithic codebase, local configuration)
+  local-server:
+    build: ./backend
+    ports: ["5000:5000"]
+    depends_on: [local-redis, local-mongo]
+    environment:
+      - NODE_ENV=local
+      - PORT=5000
+      - REDIS_URL=redis://local-redis:6379
+      - MONGODB_URL=mongodb://local-mongo:27017/cbt_local
+      - SYNC_SERVER_URL=http://backend:4000
+      - JWT_SECRET=${JWT_SECRET}
+    volumes: ["./local-media:/app/uploads"]
+
+  # Infrastructure Services
   redis:
     image: redis:7-alpine
     ports: ["6379:6379"]
+    volumes: ["redis_data:/data"]
 
   mongo:
     image: mongo:6
     ports: ["27017:27017"]
     volumes: ["mongo_data:/data/db"]
 
+  # Local Infrastructure Services
+  local-redis:
+    image: redis:7-alpine
+    ports: ["6380:6379"]
+    volumes: ["local_redis_data:/data"]
+
+  local-mongo:
+    image: mongo:6
+    ports: ["27018:27017"]
+    volumes: ["local_mongo_data:/data/db"]
+
+  # Load Balancer
   nginx:
     image: nginx:alpine
     ports: ["80:80"]
     volumes: ["./nginx.conf:/etc/nginx/nginx.conf"]
+    depends_on: [frontend, backend]
 ```
 
 **Development vs Production Containers**
