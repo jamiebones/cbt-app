@@ -1,0 +1,2 @@
+# Shared directory
+This directory will contain shared utilities, types, and constants used by both frontend and backend.
