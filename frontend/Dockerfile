@@ -13,7 +13,7 @@ RUN npm ci --only=production && npm cache clean --force
 FROM base AS development
 WORKDIR /app
 
-# Copy package files
+# Install dependencies
 COPY package*.json ./
 RUN npm ci
 
@@ -22,6 +22,10 @@ COPY . .
 
 # Expose port
 EXPOSE 3000
+
+# Set environment for hot reloading
+ENV CHOKIDAR_USEPOLLING=true
+ENV WATCHPACK_POLLING=true
 
 # Start development server with hot reload
 CMD ["npm", "start"]
@@ -40,21 +44,8 @@ COPY . .
 # Build the application
 RUN npm run build
 
-# Production stage
-FROM nginx:alpine AS production
+# Production stage - Build output only (served by main nginx)
+FROM scratch AS production
 
-# Copy built assets from builder stage
-COPY --from=builder /app/build /usr/share/nginx/html
-
-# Copy nginx configuration
-COPY docker/nginx.conf /etc/nginx/conf.d/default.conf
-
-# Expose port
-EXPOSE 80
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost/ || exit 1
-
-# Start nginx
-CMD ["nginx", "-g", "daemon off;"]
+# Copy built assets (this stage is used to extract build files)
+COPY --from=builder /app/build /build

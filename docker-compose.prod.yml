@@ -1,15 +1,14 @@
 version: "3.8"
 
 services:
-  # Frontend React Application (Production)
-  frontend:
+  # Frontend Build Stage (Production)
+  frontend-builder:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-      target: production
-    restart: unless-stopped
-    depends_on:
-      - nginx
+      target: builder
+    volumes:
+      - frontend_build:/app/build
     networks:
       - cbt-network
 
@@ -150,7 +149,7 @@ services:
           cpus: "0.2"
           memory: 128M
 
-  # NGINX Load Balancer and Reverse Proxy
+  # NGINX Load Balancer and Static File Server
   nginx:
     image: nginx:alpine
     restart: unless-stopped
@@ -161,9 +160,10 @@ services:
       - ./docker/nginx/nginx.conf:/etc/nginx/nginx.conf
       - ./docker/nginx/ssl:/etc/nginx/ssl
       - ./docker/nginx/logs:/var/log/nginx
+      - frontend_build:/usr/share/nginx/html
     depends_on:
-      - frontend
-      - api-gateway
+      - frontend-builder
+      - backend
     networks:
       - cbt-network
     deploy:
@@ -186,6 +186,8 @@ volumes:
   local_media_data:
     driver: local
   local_app_data:
+    driver: local
+  frontend_build:
     driver: local
 
 networks:

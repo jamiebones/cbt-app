@@ -5,7 +5,8 @@ FROM node:18-alpine AS base
 RUN apk add --no-cache \
     ffmpeg \
     imagemagick \
-    vips-dev
+    vips-dev \
+    curl
 
 # Install dependencies only when needed
 FROM base AS deps
@@ -37,10 +38,10 @@ EXPOSE 4000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:4000/health || exit 1
+  CMD curl -f http://localhost:4000/api/health || exit 1
 
 # Start development server with hot reload
-CMD ["nodemon", "src/index.js"]
+CMD ["nodemon", "src/server.js"]
 
 # Production stage
 FROM base AS production
@@ -65,7 +66,7 @@ EXPOSE 4000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:4000/health || exit 1
+  CMD curl -f http://localhost:4000/api/health || exit 1
 
 # Start production server
-CMD ["node", "src/index.js"]
+CMD ["node", "src/server.js"]

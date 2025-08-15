@@ -1,7 +1,7 @@
 version: "3.8"
 
 services:
-  # Frontend React Application
+  # Frontend React Application (Development)
   frontend:
     build:
       context: ./frontend
@@ -137,6 +137,7 @@ services:
       - cbt-network
 
   # NGINX Load Balancer (Optional for production-like setup)
+  # NGINX Load Balancer (Optional - for production-like testing)
   nginx:
     image: nginx:alpine
     ports:
@@ -147,11 +148,11 @@ services:
       - ./docker/nginx/ssl:/etc/nginx/ssl
     depends_on:
       - frontend
-      - api-gateway
+      - backend
     networks:
       - cbt-network
     profiles:
-      - production
+      - loadbalancer
 
 volumes:
   mongo_data:

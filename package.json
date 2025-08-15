@@ -1,0 +1,55 @@
+{
+  "name": "cbt-application",
+  "version": "1.0.0",
+  "description": "Computer-Based Test (CBT) Application - MERN stack monolithic application with Docker containerization",
+  "main": "index.js",
+  "scripts": {
+    "dev": "docker-compose up --build",
+    "dev:detached": "docker-compose up -d --build",
+    "dev:logs": "docker-compose logs -f",
+    "dev:stop": "docker-compose down",
+    "dev:clean": "docker-compose down -v --rmi all",
+    "prod": "docker-compose -f docker-compose.prod.yml up --build",
+    "prod:detached": "docker-compose -f docker-compose.prod.yml up -d --build",
+    "prod:stop": "docker-compose -f docker-compose.prod.yml down",
+    "local-server": "docker-compose -f docker-compose.local.yml up --build",
+    "local-server:detached": "docker-compose -f docker-compose.local.yml up -d --build",
+    "local-server:stop": "docker-compose -f docker-compose.local.yml down",
+    "setup": "npm run setup:frontend && npm run setup:backend",
+    "setup:frontend": "cd frontend && npm install",
+    "setup:backend": "cd backend && npm install",
+    "test": "npm run test:frontend && npm run test:backend",
+    "test:frontend": "cd frontend && npm test",
+    "test:backend": "cd backend && npm test",
+    "lint": "npm run lint:frontend && npm run lint:backend",
+    "lint:frontend": "cd frontend && npm run lint",
+    "lint:backend": "cd backend && npm run lint",
+    "clean": "docker system prune -f && docker volume prune -f"
+  },
+  "keywords": [
+    "cbt",
+    "testing",
+    "education",
+    "mern",
+    "docker",
+    "monolithic",
+    "react",
+    "nodejs",
+    "mongodb",
+    "redis"
+  ],
+  "author": "CBT Application Team",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/your-org/cbt-application.git"
+  },
+  "bugs": {
+    "url": "https://github.com/your-org/cbt-application/issues"
+  },
+  "homepage": "https://github.com/your-org/cbt-application#readme"
+}
