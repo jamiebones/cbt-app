@@ -5,8 +5,8 @@ import React, {
   useEffect,
   ReactNode,
 } from 'react';
-import { User, AuthState, LoginCredentials, RegisterData } from '@/types';
-import { authService, AuthResponse } from '@/services/auth';
+import { User, AuthState, LoginCredentials, RegisterData } from '../types';
+import { authService, AuthResponse } from '../services/auth';
 
 // Auth action types
 type AuthAction =

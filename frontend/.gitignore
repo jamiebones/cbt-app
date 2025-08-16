@@ -41,6 +41,5 @@ Thumbs.db
 *.temp
 .cache/
 
-# Package manager lock files (if using different ones)
+# Only exclude yarn.lock if using npm, keep package-lock.json
 yarn.lock
-package-lock.json

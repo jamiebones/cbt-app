@@ -1,6 +1,6 @@
 import axios, { AxiosInstance, AxiosResponse, AxiosError } from 'axios';
-import { ApiResponse } from '@/types';
-import { config, API_ENDPOINTS, APP_CONSTANTS } from '@/utils/config';
+import { ApiResponse } from '../types';
+import { config, API_ENDPOINTS, APP_CONSTANTS } from '../utils/config';
 
 // Create axios instance with default configuration
 const createApiInstance = (baseURL: string): AxiosInstance => {

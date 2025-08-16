@@ -1,4 +1,4 @@
-import { AppConfig } from '@/types';
+import { AppConfig } from '../types';
 
 // Environment variable helpers
 const getEnvVar = (name: string, defaultValue?: string): string => {

@@ -3,6 +3,14 @@
  * Manages internal module communication and dependencies
  */
 
+import { logger } from './logger.js';
+import database from './database.js';
+import redis from './redis.js';
+import { AuthService } from '../modules/auth/service.js';
+import { UserService } from '../modules/users/service.js';
+import { TestService } from '../modules/tests/service.js';
+import { SubscriptionService } from '../modules/subscriptions/service.js';
+
 class Container {
     constructor() {
         this.services = new Map();
@@ -61,24 +69,12 @@ class Container {
 const container = new Container();
 
 // Register core services
-container.register('logger', () => require('./logger').logger, { singleton: true });
-container.register('database', () => require('./database'), { singleton: true });
-container.register('redis', () => require('./redis'), { singleton: true });
+container.register('logger', () => logger, { singleton: true });
+container.register('database', () => database, { singleton: true });
+container.register('redis', () => redis, { singleton: true });
 
 // Register application services
-container.register('authService', () => {
-    const { AuthService } = require('../modules/auth/service');
-    return new AuthService(
-        container.get('logger'),
-        container.get('userService')
-    );
-}, {
-    singleton: true,
-    dependencies: ['logger', 'userService']
-});
-
 container.register('userService', () => {
-    const { UserService } = require('../modules/users/service');
     return new UserService(
         container.get('logger'),
         container.get('database')
@@ -88,8 +84,27 @@ container.register('userService', () => {
     dependencies: ['logger', 'database']
 });
 
+container.register('authService', () => {
+    return new AuthService(
+        container.get('logger'),
+        container.get('userService')
+    );
+}, {
+    singleton: true,
+    dependencies: ['logger', 'userService']
+});
+
+container.register('subscriptionService', () => {
+    return new SubscriptionService(
+        container.get('logger'),
+        container.get('database')
+    );
+}, {
+    singleton: true,
+    dependencies: ['logger', 'database']
+});
+
 container.register('testService', () => {
-    const { TestService } = require('../modules/tests/service');
     return new TestService(
         container.get('logger'),
         container.get('database'),
@@ -100,15 +115,4 @@ container.register('testService', () => {
     dependencies: ['logger', 'database', 'subscriptionService']
 });
 
-container.register('subscriptionService', () => {
-    const { SubscriptionService } = require('../modules/subscriptions/service');
-    return new SubscriptionService(
-        container.get('logger'),
-        container.get('database')
-    );
-}, {
-    singleton: true,
-    dependencies: ['logger', 'database']
-});
-
-module.exports = { container };
+export { container };

@@ -1,0 +1,86 @@
+# Dependencies
+node_modules/
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Docker volumes data (development only)
+mongo_data/
+local_mongo_data/
+redis_data/
+local_redis_data/
+
+# Media uploads (development only)
+media/
+local-media/
+uploads/
+local-data/
+
+# SSL certificates
+ssl/
+certs/
+
+# Backup files
+*.bak
+*.backup
+
+# Temporary files
+temp/
+tmp/
+*.tmp
+
+# Coverage and test outputs
+coverage/
+.nyc_output/
+test-results/
+e2e-results/
+
+# Package manager specific
+.pnp
+.pnp.js
+.yarn-integrity
+
+# Serverless directories
+.serverless/
+
+# Build outputs
+build/
+dist/
+
+# Cache directories
+.cache/
+.parcel-cache/
+
+# Database dumps
+*.sql
+*.dump
+
+# Documentation build
+docs/_build/

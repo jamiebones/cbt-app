@@ -1,12 +1,16 @@
 # Multi-stage Dockerfile for Monolithic CBT Backend
 FROM node:18-alpine AS base
 
-# Install system dependencies for media processing
+# Install system dependencies for media processing and build tools
 RUN apk add --no-cache \
-    ffmpeg \
-    imagemagick \
-    vips-dev \
-    curl
+  ffmpeg \
+  imagemagick \
+  vips-dev \
+  curl \
+  make \
+  g++ \
+  python3 \
+  libc6-compat
 
 # Install dependencies only when needed
 FROM base AS deps
