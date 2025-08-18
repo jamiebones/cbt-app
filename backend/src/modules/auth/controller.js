@@ -1,35 +1,22 @@
-import { container } from '../../config/container.js';
+import { authService } from './service.js';
+import { logger } from '../../config/logger.js';
 
 class AuthController {
     constructor() {
-        this.logger = container.get('logger');
-        this.authService = container.get('authService');
+        this.logger = logger;
+        this.authService = authService;
     }
 
     register = async (req, res) => {
         try {
             this.logger.info('Auth register endpoint called');
-            const { email, password, name } = req.body;
+            const userData = req.body;
 
-            if (!email || !password || !name) {
-                return res.status(400).json({
-                    success: false,
-                    message: 'Please provide email, password and name'
-                });
-            }
-
-            const { user, token } = await this.authService.register({ email, password, name });
+            const result = await this.authService.register(userData);
 
             res.status(201).json({
                 success: true,
-                data: {
-                    user: {
-                        id: user.id,
-                        email: user.email,
-                        name: user.name
-                    },
-                    token
-                }
+                data: result
             });
         } catch (error) {
             this.logger.error('Registration failed:', error);
@@ -52,18 +39,11 @@ class AuthController {
                 });
             }
 
-            const { user, token } = await this.authService.login(email, password);
+            const result = await this.authService.login(email, password);
 
             res.json({
                 success: true,
-                data: {
-                    user: {
-                        id: user.id,
-                        email: user.email,
-                        name: user.name
-                    },
-                    token
-                }
+                data: result
             });
         } catch (error) {
             this.logger.error('Login failed:', error);
@@ -75,29 +55,127 @@ class AuthController {
     };
 
     logout = async (req, res) => {
-        // Since we're using JWT, we don't need to do anything server-side
-        // The client should remove the token
-        res.json({
-            success: true,
-            message: 'Logged out successfully'
-        });
+        try {
+            const userId = req.user?.id;
+            const result = await this.authService.logout(userId);
+            res.json({
+                success: true,
+                ...result
+            });
+        } catch (error) {
+            this.logger.error('Logout failed:', error);
+            res.status(500).json({
+                success: false,
+                message: error.message || 'Logout failed'
+            });
+        }
     };
 
     refreshToken = async (req, res) => {
         try {
             this.logger.info('Auth refresh token endpoint called');
-            const userId = req.user.id; // From auth middleware
-            const token = await this.authService.refreshToken(userId);
+            const { refreshToken } = req.body;
+
+            if (!refreshToken) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Refresh token is required'
+                });
+            }
+
+            const result = await this.authService.refreshTokens(refreshToken);
 
             res.json({
                 success: true,
-                data: { token }
+                data: result
             });
         } catch (error) {
             this.logger.error('Token refresh failed:', error);
             res.status(401).json({
                 success: false,
                 message: error.message || 'Token refresh failed'
+            });
+        }
+    };
+
+    requestPasswordReset = async (req, res) => {
+        try {
+            this.logger.info('Password reset request endpoint called');
+            const { email } = req.body;
+
+            if (!email) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Email is required'
+                });
+            }
+
+            const result = await this.authService.requestPasswordReset(email);
+
+            res.json({
+                success: true,
+                ...result
+            });
+        } catch (error) {
+            this.logger.error('Password reset request failed:', error);
+            res.status(500).json({
+                success: false,
+                message: error.message || 'Password reset request failed'
+            });
+        }
+    };
+
+    resetPassword = async (req, res) => {
+        try {
+            this.logger.info('Password reset endpoint called');
+            const { resetToken, newPassword } = req.body;
+
+            if (!resetToken || !newPassword) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Reset token and new password are required'
+                });
+            }
+
+            const result = await this.authService.resetPassword(resetToken, newPassword);
+
+            res.json({
+                success: true,
+                ...result
+            });
+        } catch (error) {
+            this.logger.error('Password reset failed:', error);
+            res.status(400).json({
+                success: false,
+                message: error.message || 'Password reset failed'
+            });
+        }
+    };
+
+    changePassword = async (req, res) => {
+        try {
+            this.logger.info('Change password endpoint called');
+            const { currentPassword, newPassword } = req.body;
+            const userId = req.user.id;
+
+            if (!currentPassword || !newPassword) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Current password and new password are required'
+                });
+            }
+
+            const result = await this.authService.changePassword(userId, currentPassword, newPassword);
+
+            res.json({
+                success: true,
+                ...result
+            });
+        } catch (error) {
+            this.logger.error('Password change failed:', error);
+            res.status(400).json({
+                success: false,
+                message: error.message || 'Password change failed'
             });
         }
     };
@@ -111,11 +189,7 @@ class AuthController {
             res.json({
                 success: true,
                 data: {
-                    user: {
-                        id: user.id,
-                        email: user.email,
-                        name: user.name
-                    }
+                    user: user.toJSON()
                 }
             });
         } catch (error) {

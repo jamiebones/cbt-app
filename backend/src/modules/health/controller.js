@@ -1,6 +1,6 @@
-const mongoose = require('mongoose');
-const { getRedisClient } = require('../../config/redis');
-const { logger } = require('../../config/logger');
+import mongoose from 'mongoose';
+import { getRedisClient } from '../../config/redis.js';
+import { logger } from '../../config/logger.js';
 
 class HealthController {
     // Basic health check
@@ -146,4 +146,4 @@ class HealthController {
 
 const healthController = new HealthController();
 
-module.exports = { healthController };
+export { healthController };

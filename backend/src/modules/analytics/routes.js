@@ -1,5 +1,5 @@
-const express = require('express');
-const { analyticsController } = require('./controller');
+import express from 'express';
+import { analyticsController } from './controller.js';
 
 const router = express.Router();
 
@@ -12,4 +12,4 @@ router.get('/reports/:centerId', analyticsController.generateReports);
 router.get('/export/csv/:testId', analyticsController.exportResultsCSV);
 router.get('/export/pdf/:testId', analyticsController.exportResultsPDF);
 
-module.exports = router;
+export default router;

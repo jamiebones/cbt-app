@@ -1,5 +1,5 @@
-const express = require('express');
-const { syncController } = require('./controller');
+import express from 'express';
+import { syncController } from './controller.js';
 
 const router = express.Router();
 
@@ -12,4 +12,4 @@ router.post('/upload/results', syncController.uploadResults);
 router.get('/status', syncController.getSyncStatus);
 router.post('/status/update', syncController.updateSyncStatus);
 
-module.exports = router;
+export default router;

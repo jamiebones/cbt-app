@@ -1,4 +1,4 @@
-const { logger } = require('../../config/logger');
+import { logger } from "../../config/logger.js";
 
 class SubscriptionController {
     getSubscriptions = async (req, res) => {
@@ -52,4 +52,4 @@ class SubscriptionController {
 
 const subscriptionController = new SubscriptionController();
 
-module.exports = { subscriptionController };
+export { subscriptionController };

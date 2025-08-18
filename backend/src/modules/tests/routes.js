@@ -1,5 +1,5 @@
-const express = require('express');
-const { testController } = require('./controller');
+import express from 'express';
+import { testController } from './controller.js';
 
 const router = express.Router();
 
@@ -24,4 +24,4 @@ router.post('/:testId/start', testController.startTest);
 router.post('/:testId/submit', testController.submitTest);
 router.get('/:testId/session/:sessionId', testController.getTestSession);
 
-module.exports = router;
+export default router;

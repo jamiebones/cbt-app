@@ -1,4 +1,4 @@
-const { logger } = require('../../config/logger');
+import { logger } from "../../config/logger.js";
 
 class SyncController {
     downloadUsers = async (req, res) => {
@@ -44,4 +44,4 @@ class SyncController {
 
 const syncController = new SyncController();
 
-module.exports = { syncController };
+export { syncController };

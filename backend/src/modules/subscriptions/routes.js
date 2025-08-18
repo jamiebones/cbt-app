@@ -1,5 +1,5 @@
-const express = require('express');
-const { subscriptionController } = require('./controller');
+import express from 'express';
+import { subscriptionController } from './controller.js';
 
 const router = express.Router();
 
@@ -13,4 +13,4 @@ router.post('/:centerId/downgrade', subscriptionController.downgradeSubscription
 router.get('/:centerId/limits', subscriptionController.getSubscriptionLimits);
 router.post('/:centerId/validate', subscriptionController.validateSubscriptionAction);
 
-module.exports = router;
+export default router;

@@ -8,6 +8,13 @@ const connectRedis = async () => {
         const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
         const redisPassword = process.env.REDIS_PASSWORD;
 
+        logger.info(`Attempting to connect to Redis at: ${redisUrl}`);
+        if (redisPassword) {
+            logger.info('Redis password provided - using authentication');
+        } else {
+            logger.info('No Redis password provided - connecting without auth');
+        }
+
         const clientOptions = {
             url: redisUrl,
             socket: {

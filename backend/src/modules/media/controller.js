@@ -1,4 +1,4 @@
-const { logger } = require('../../config/logger');
+import { logger } from "../../config/logger.js";
 
 class MediaController {
     uploadImage = async (req, res) => {
@@ -52,4 +52,4 @@ class MediaController {
 
 const mediaController = new MediaController();
 
-module.exports = { mediaController };
+export { mediaController };

@@ -1,4 +1,4 @@
-const { logger } = require('../../config/logger');
+import { logger } from '../../config/logger.js';
 
 class UserController {
     getUsers = async (req, res) => {
@@ -68,4 +68,4 @@ class UserController {
 
 const userController = new UserController();
 
-module.exports = { userController };
+export { userController };

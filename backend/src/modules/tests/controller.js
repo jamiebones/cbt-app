@@ -1,4 +1,4 @@
-const { logger } = require('../../config/logger');
+import { logger } from "../../config/logger.js";
 
 class TestController {
     getTests = async (req, res) => {
@@ -108,4 +108,4 @@ class TestController {
 
 const testController = new TestController();
 
-module.exports = { testController };
+export { testController };

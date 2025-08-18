@@ -1,5 +1,5 @@
-const express = require('express');
-const { mediaController } = require('./controller');
+import express from 'express';
+import { mediaController } from './controller.js';
 
 const router = express.Router();
 
@@ -13,4 +13,4 @@ router.delete('/:id', mediaController.deleteMedia);
 router.post('/process/optimize', mediaController.optimizeMedia);
 router.get('/info/:id', mediaController.getMediaInfo);
 
-module.exports = router;
+export default router;

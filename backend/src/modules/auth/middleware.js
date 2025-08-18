@@ -1,4 +1,5 @@
-import { container } from '../../config/container.js';
+import { authService } from './service.js';
+import { logger } from '../../config/logger.js';
 
 const authenticate = async (req, res, next) => {
     try {
@@ -11,7 +12,6 @@ const authenticate = async (req, res, next) => {
         }
 
         const token = authHeader.split(' ')[1];
-        const authService = container.get('authService');
         const user = await authService.validateToken(token);
 
         if (!user) {
@@ -25,7 +25,6 @@ const authenticate = async (req, res, next) => {
         req.user = user;
         next();
     } catch (error) {
-        const logger = container.get('logger');
         logger.error('Authentication middleware error:', error);
         res.status(401).json({
             success: false,
