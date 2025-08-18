@@ -130,7 +130,7 @@ const userSchema = new Schema({
         },
         maxQuestionsPerTest: {
             type: Number,
-            default: 100 // Free tier limit
+            default: 50 // Free tier limit
         },
         canImportExcel: {
             type: Boolean,

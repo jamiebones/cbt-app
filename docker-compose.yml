@@ -37,9 +37,11 @@ services:
     environment:
       - NODE_ENV=development
       - PORT=4000
-      - MONGODB_URL=mongodb://cbt_user:cbt_password_123@mongo:27017/cbt_app
+      - MONGODB_URL=mongodb://${CBT_USER}:${CBT_USER_PASSWORD}@mongo:27017/cbt_app
       - REDIS_URL=redis://redis:6379
       - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - CBT_USER=${CBT_USER}
+      - CBT_USER_PASSWORD=${CBT_USER_PASSWORD}
       - JWT_SECRET=${JWT_SECRET}
       - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
       - JWT_EXPIRES_IN=15m
@@ -99,7 +101,7 @@ services:
     environment:
       - MONGO_INITDB_ROOT_USERNAME=${MONGO_ROOT_USERNAME}
       - MONGO_INITDB_ROOT_PASSWORD=${MONGO_ROOT_PASSWORD}
-      - MONGO_INITDB_DATABASE=cbt_main
+      - MONGO_INITDB_DATABASE=cbt_app
     networks:
       - cbt-network
 

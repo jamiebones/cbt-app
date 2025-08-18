@@ -3,7 +3,7 @@
 print('Starting MongoDB initialization...');
 
 // Create application user for the main database
-db = db.getSiblingDB('cbt_app');
+let db = db.getSiblingDB('cbt_app');
 
 // Create user with read/write access to cbt_app database
 try {
