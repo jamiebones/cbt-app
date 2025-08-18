@@ -1,107 +1,296 @@
-import { logger } from "../../config/logger.js";
+import { testService } from './service.js';
+import { logger } from '../../config/logger.js';
 
 class TestController {
+    constructor() {
+        this.testService = testService;
+    }
+
+    // Get all tests for the authenticated user's test center
     getTests = async (req, res) => {
-        logger.info('Get tests endpoint called');
-        res.status(501).json({
-            success: false,
-            message: 'Get tests not implemented yet'
-        });
+        try {
+            const ownerId = req.user.role === 'test_center_owner'
+                ? req.user._id
+                : req.user.testCenterOwner;
+
+            const options = {
+                page: req.query.page || 1,
+                limit: req.query.limit || 20,
+                status: req.query.status,
+                search: req.query.search,
+                subject: req.query.subject,
+                sort: req.query.sort || 'createdAt'
+            };
+
+            const result = await this.testService.getTestsByOwner(ownerId, options);
+
+            res.status(200).json({
+                success: true,
+                data: result.tests,
+                pagination: result.pagination
+            });
+        } catch (error) {
+            logger.error('Get tests error:', error);
+            res.status(500).json({
+                success: false,
+                message: error.message || 'Failed to get tests'
+            });
+        }
     };
 
+    // Get a specific test by ID
     getTestById = async (req, res) => {
-        logger.info('Get test by ID endpoint called');
-        res.status(501).json({
-            success: false,
-            message: 'Get test by ID not implemented yet'
-        });
+        try {
+            const { id } = req.params;
+            const ownerId = req.user.role === 'test_center_owner'
+                ? req.user._id
+                : req.user.testCenterOwner;
+
+            const test = await this.testService.getTestById(id, ownerId);
+
+            res.status(200).json({
+                success: true,
+                data: test
+            });
+        } catch (error) {
+            logger.error('Get test by ID error:', error);
+            const statusCode = error.message.includes('not found') ? 404 : 500;
+            res.status(statusCode).json({
+                success: false,
+                message: error.message || 'Failed to get test'
+            });
+        }
     };
 
+    // Create a new test
     createTest = async (req, res) => {
-        logger.info('Create test endpoint called');
-        res.status(501).json({
-            success: false,
-            message: 'Create test not implemented yet'
-        });
+        try {
+            const ownerId = req.user.role === 'test_center_owner'
+                ? req.user._id
+                : req.user.testCenterOwner;
+
+            const test = await this.testService.createTest(
+                req.body,
+                ownerId,
+                req.user._id
+            );
+
+            res.status(201).json({
+                success: true,
+                message: 'Test created successfully',
+                data: test
+            });
+        } catch (error) {
+            logger.error('Create test error:', error);
+            const statusCode = error.message.includes('subscription') ||
+                error.message.includes('limit') ? 403 : 400;
+            res.status(statusCode).json({
+                success: false,
+                message: error.message || 'Failed to create test'
+            });
+        }
     };
 
+    // Update an existing test
     updateTest = async (req, res) => {
-        logger.info('Update test endpoint called');
-        res.status(501).json({
-            success: false,
-            message: 'Update test not implemented yet'
-        });
+        try {
+            const { id } = req.params;
+            const ownerId = req.user.role === 'test_center_owner'
+                ? req.user._id
+                : req.user.testCenterOwner;
+
+            const test = await this.testService.updateTest(
+                id,
+                req.body,
+                ownerId,
+                req.user._id
+            );
+
+            res.status(200).json({
+                success: true,
+                message: 'Test updated successfully',
+                data: test
+            });
+        } catch (error) {
+            logger.error('Update test error:', error);
+            const statusCode = error.message.includes('not found') ? 404 : 400;
+            res.status(statusCode).json({
+                success: false,
+                message: error.message || 'Failed to update test'
+            });
+        }
     };
 
+    // Delete a test
     deleteTest = async (req, res) => {
-        logger.info('Delete test endpoint called');
-        res.status(501).json({
-            success: false,
-            message: 'Delete test not implemented yet'
-        });
+        try {
+            const { id } = req.params;
+            const ownerId = req.user.role === 'test_center_owner'
+                ? req.user._id
+                : req.user.testCenterOwner;
+
+            const result = await this.testService.deleteTest(id, ownerId);
+
+            res.status(200).json({
+                success: true,
+                message: result.message
+            });
+        } catch (error) {
+            logger.error('Delete test error:', error);
+            const statusCode = error.message.includes('not found') ? 404 : 400;
+            res.status(statusCode).json({
+                success: false,
+                message: error.message || 'Failed to delete test'
+            });
+        }
     };
 
+    // Get questions for a specific test
     getTestQuestions = async (req, res) => {
-        logger.info('Get test questions endpoint called');
-        res.status(501).json({
-            success: false,
-            message: 'Get test questions not implemented yet'
-        });
+        try {
+            const { testId } = req.params;
+            const ownerId = req.user.role === 'test_center_owner'
+                ? req.user._id
+                : req.user.testCenterOwner;
+
+            const questions = await this.testService.getTestQuestions(testId, ownerId);
+
+            res.status(200).json({
+                success: true,
+                data: questions
+            });
+        } catch (error) {
+            logger.error('Get test questions error:', error);
+            const statusCode = error.message.includes('not found') ? 404 : 500;
+            res.status(statusCode).json({
+                success: false,
+                message: error.message || 'Failed to get test questions'
+            });
+        }
     };
 
+    // Add a question to a test
     addQuestion = async (req, res) => {
-        logger.info('Add question endpoint called');
-        res.status(501).json({
-            success: false,
-            message: 'Add question not implemented yet'
-        });
+        try {
+            const { testId } = req.params;
+            const ownerId = req.user.role === 'test_center_owner'
+                ? req.user._id
+                : req.user.testCenterOwner;
+
+            const question = await this.testService.addQuestionToTest(
+                testId,
+                req.body,
+                ownerId,
+                req.user._id
+            );
+
+            res.status(201).json({
+                success: true,
+                message: 'Question added to test successfully',
+                data: question
+            });
+        } catch (error) {
+            logger.error('Add question error:', error);
+            const statusCode = error.message.includes('subscription') ||
+                error.message.includes('limit') ? 403 : 400;
+            res.status(statusCode).json({
+                success: false,
+                message: error.message || 'Failed to add question to test'
+            });
+        }
     };
 
+    // Update a question in a test
     updateQuestion = async (req, res) => {
-        logger.info('Update question endpoint called');
-        res.status(501).json({
-            success: false,
-            message: 'Update question not implemented yet'
-        });
+        try {
+            const { testId, questionId } = req.params;
+            const ownerId = req.user.role === 'test_center_owner'
+                ? req.user._id
+                : req.user.testCenterOwner;
+
+            const question = await this.testService.updateQuestionInTest(
+                testId,
+                questionId,
+                req.body,
+                ownerId
+            );
+
+            res.status(200).json({
+                success: true,
+                message: 'Question updated successfully',
+                data: question
+            });
+        } catch (error) {
+            logger.error('Update question error:', error);
+            const statusCode = error.message.includes('not found') ? 404 : 400;
+            res.status(statusCode).json({
+                success: false,
+                message: error.message || 'Failed to update question'
+            });
+        }
     };
 
+    // Remove a question from a test
     deleteQuestion = async (req, res) => {
-        logger.info('Delete question endpoint called');
-        res.status(501).json({
-            success: false,
-            message: 'Delete question not implemented yet'
-        });
+        try {
+            const { testId, questionId } = req.params;
+            const ownerId = req.user.role === 'test_center_owner'
+                ? req.user._id
+                : req.user.testCenterOwner;
+
+            const result = await this.testService.removeQuestionFromTest(
+                testId,
+                questionId,
+                ownerId
+            );
+
+            res.status(200).json({
+                success: true,
+                message: result.message
+            });
+        } catch (error) {
+            logger.error('Delete question error:', error);
+            const statusCode = error.message.includes('not found') ? 404 : 400;
+            res.status(statusCode).json({
+                success: false,
+                message: error.message || 'Failed to remove question from test'
+            });
+        }
     };
 
+    // Import questions from Excel (placeholder)
     importFromExcel = async (req, res) => {
         logger.info('Import from Excel endpoint called');
         res.status(501).json({
             success: false,
-            message: 'Import from Excel not implemented yet'
+            message: 'Excel import feature will be implemented in the next phase'
         });
     };
 
+    // Start a test session (placeholder for student interface)
     startTest = async (req, res) => {
         logger.info('Start test endpoint called');
         res.status(501).json({
             success: false,
-            message: 'Start test not implemented yet'
+            message: 'Test session management will be implemented in the next phase'
         });
     };
 
+    // Submit test answers (placeholder for student interface)
     submitTest = async (req, res) => {
         logger.info('Submit test endpoint called');
         res.status(501).json({
             success: false,
-            message: 'Submit test not implemented yet'
+            message: 'Test submission will be implemented in the next phase'
         });
     };
 
+    // Get test session details (placeholder for student interface)
     getTestSession = async (req, res) => {
         logger.info('Get test session endpoint called');
         res.status(501).json({
             success: false,
-            message: 'Get test session not implemented yet'
+            message: 'Test session retrieval will be implemented in the next phase'
         });
     };
 }

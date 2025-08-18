@@ -243,9 +243,16 @@ class SubscriptionService {
 
     // Private helper methods
     async countUserTests(ownerId) {
-        // This would count tests in the Test model (to be implemented)
-        // For now, return 0 as placeholder
-        return 0;
+        try {
+            const { Test } = await import('../../models/index.js');
+            return await Test.countDocuments({
+                testCenterOwner: ownerId,
+                status: { $ne: 'archived' }
+            });
+        } catch (error) {
+            logger.error('Failed to count tests:', error);
+            return 0;
+        }
     }
 
     async countStudents(ownerId) {
@@ -263,8 +270,16 @@ class SubscriptionService {
     }
 
     async countQuestions(ownerId) {
-        // This would count questions across all tests (to be implemented)
-        return 0;
+        try {
+            const { Question } = await import('../../models/index.js');
+            return await Question.countDocuments({
+                testCenterOwner: ownerId,
+                isActive: true
+            });
+        } catch (error) {
+            logger.error('Failed to count questions:', error);
+            return 0;
+        }
     }
 
     async calculateStorageUsage(ownerId) {

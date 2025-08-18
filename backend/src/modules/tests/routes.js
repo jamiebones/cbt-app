@@ -1,7 +1,11 @@
 import express from 'express';
 import { testController } from './controller.js';
+import { authenticate } from '../auth/middleware.js';
 
 const router = express.Router();
+
+// All test routes require authentication
+router.use(authenticate);
 
 // Test management routes
 router.get('/', testController.getTests);
@@ -16,10 +20,10 @@ router.post('/:testId/questions', testController.addQuestion);
 router.put('/:testId/questions/:questionId', testController.updateQuestion);
 router.delete('/:testId/questions/:questionId', testController.deleteQuestion);
 
-// Excel import routes
+// Excel import routes (placeholder for next phase)
 router.post('/import/excel', testController.importFromExcel);
 
-// Test taking routes
+// Test taking routes (placeholder for student interface)
 router.post('/:testId/start', testController.startTest);
 router.post('/:testId/submit', testController.submitTest);
 router.get('/:testId/session/:sessionId', testController.getTestSession);

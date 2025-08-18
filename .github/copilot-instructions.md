@@ -1,0 +1,185 @@
+# CBT Application - AI Coding Agent Instructions
+
+## Architecture Overview
+
+This is a **monolithic MERN stack** Computer-Based Testing application with Docker containerization. The backend uses **ES6 modules** throughout (`"type": "module"` in package.json).
+
+### Key Architectural Decisions
+
+- **Monolithic Backend**: Single Express.js server with modular internal structure in `backend/src/modules/`
+- **Hybrid Online/Offline**: Same backend codebase serves both online management and offline test delivery
+- **Role-Based System**: `test_center_owner` → `test_creator` → `student` hierarchy
+- **Subscription Tiers**: Free/premium limits enforced at service layer
+
+## Development Patterns
+
+### Module Structure (Critical Pattern)
+
+All backend modules follow this exact structure:
+
+```
+backend/src/modules/{feature}/
+├── service.js      # Business logic, singleton export
+├── controller.js   # HTTP handlers, singleton export
+├── routes.js       # Express routes, default export
+└── middleware.js   # Feature-specific middleware (optional)
+```
+
+### Import/Export Conventions
+
+```javascript
+// Service Pattern (singleton)
+class FeatureService { ... }
+const featureService = new FeatureService();
+export { featureService };
+
+// Controller Pattern (singleton)
+class FeatureController {
+    constructor() { this.service = featureService; }
+}
+const featureController = new FeatureController();
+export { featureController };
+
+// Routes Pattern (default export)
+import { featureController } from './controller.js';
+const router = express.Router();
+export default router;
+```
+
+### Database Integration
+
+- **Models**: Located in `backend/src/models/`, use Mongoose with ES6 imports
+- **MongoDB**: Authenticated setup with `cbt_user` application user
+- **Redis**: Session/cache with password authentication
+- **Indexes**: Always add for performance-critical fields
+
+### Performance Patterns
+
+- **Parallel Operations**: Use `Promise.all()` for independent async operations (see `subscriptions/service.js` `getUsageStats`)
+- **Singleton Services**: All services are singletons to avoid memory overhead
+- **Connection Pooling**: MongoDB and Redis connections managed in `config/` directory
+
+## Critical File Locations
+
+### Backend Core
+
+- **Entry Point**: `backend/src/server.js` - ES6 module setup, route mounting
+- **Models**: `backend/src/models/index.js` - Centralized model exports
+- **Config**: `backend/src/config/` - Database, Redis, logging setup
+- **Middleware**: `backend/src/middleware/` - Global error handling, 404 handling
+
+### Module Examples
+
+- **Auth Module**: `backend/src/modules/auth/` - JWT authentication, middleware
+- **Subscriptions**: `backend/src/modules/subscriptions/` - Tier validation, usage limits
+- **Users**: `backend/src/modules/users/` - Role-based user management
+
+### Docker Setup
+
+- **Development**: `docker-compose.yml` - Full stack with hot reload
+- **Scripts**: `docker/dev-scripts.sh` - Convenience commands for container management
+- **Init**: `docker/mongo-init/init-db.js` - MongoDB setup (MongoDB shell syntax, NOT Node.js)
+
+## Development Workflow
+
+### Starting Development
+
+```bash
+# Always use Docker for development
+docker-compose up -d
+# Or use convenience script
+./docker/dev-scripts.sh start
+```
+
+### Service Ports (Development)
+
+- Frontend: `3000` (React)
+- Backend: `4000` (Main API)
+- Local Server: `5000` (Offline delivery)
+- MongoDB: `27017` (Main), `27018` (Local)
+- Redis: `6379` (Main), `6380` (Local)
+
+### Testing Commands
+
+```bash
+# Backend tests
+cd backend && npm test
+# Frontend tests
+cd frontend && npm test
+# Full Docker test
+docker-compose -f docker-compose.test.yml up --abort-on-container-exit
+```
+
+## Common Patterns
+
+### Subscription Validation
+
+Always check subscription limits before operations:
+
+```javascript
+const validation = await subscriptionService.validateAction(
+  userId,
+  "createTest"
+);
+if (!validation.allowed) {
+  return res.status(403).json({ message: validation.message });
+}
+```
+
+### Error Handling
+
+- Use `express-async-errors` for automatic async error handling
+- All errors go through `middleware/errorHandler.js`
+- Use structured logging with `config/logger.js`
+
+### Authentication Flow
+
+- JWT tokens in headers: `Authorization: Bearer <token>`
+- Middleware: `modules/auth/middleware.js` `authenticate` function
+- User roles checked at route/controller level
+
+### Database Queries
+
+- Use Mongoose models from `models/index.js`
+- Always handle promise rejections
+- Use lean queries for read-only operations
+- Index frequently queried fields
+
+## Integration Points
+
+### Frontend-Backend Communication
+
+- API Base URL: `http://localhost:4000/api`
+- All routes prefixed with `/api/{module}`
+- CORS configured for development origins
+
+### Docker Container Communication
+
+- Services communicate via Docker network `cbt-network`
+- Internal hostnames: `mongo`, `redis`, `backend`, `frontend`
+- Environment variables in `.env` file (copy from `.env.example`)
+
+### MongoDB Authentication
+
+- Root admin: `admin:dev_password_123`
+- Application user: `cbt_user:cbt_password_123`
+- Database: `cbt_app` (main), `cbt_local` (offline)
+
+## Common Mistakes to Avoid
+
+1. **Wrong Import Syntax**: This is ES6 modules - use `import/export`, not `require/module.exports`
+2. **MongoDB Init Scripts**: Use MongoDB shell syntax, NOT Node.js (no `require`, `process.env`)
+3. **Service Instantiation**: Services are singletons - import the instance, don't create new ones
+4. **Environment Variables**: Only import `dotenv` once in `server.js`, not in every file
+5. **Route Mounting**: Mount routes in `server.js` with `/api` prefix
+
+## Next Implementation Phase
+
+Based on current progress, the next major tasks are:
+
+1. **Test & Question Management**: Complete CRUD operations for tests and questions
+2. **Excel Import System**: Bulk question import with validation
+3. **Test Taking Interface**: Student test session management
+4. **Analytics & Reporting**: Performance tracking and report generation
+
+When implementing new features, follow the established module pattern and maintain consistency with existing subscription validation and authentication flows.
