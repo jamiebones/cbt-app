@@ -59,6 +59,87 @@ export default router;
 - **Singleton Services**: All services are singletons to avoid memory overhead
 - **Connection Pooling**: MongoDB and Redis connections managed in `config/` directory
 
+#### Promise.all Optimization Pattern (CRITICAL)
+
+**Always use `Promise.all()` for independent async operations to improve performance:**
+
+```javascript
+// ❌ SLOW - Sequential execution
+const user = await User.findById(userId);
+const subject = await Subject.findById(subjectId);
+const questions = await Question.find({ subject: subjectId });
+
+// ✅ FAST - Parallel execution
+const [user, subject, questions] = await Promise.all([
+  User.findById(userId),
+  Subject.findById(subjectId),
+  Question.find({ subject: subjectId }),
+]);
+```
+
+**Common Optimization Scenarios:**
+
+1. **Database Queries + Counts:**
+
+```javascript
+// ❌ Sequential
+const questions = await Question.find(query);
+const total = await Question.countDocuments(query);
+
+// ✅ Parallel
+const [questions, total] = await Promise.all([
+  Question.find(query),
+  Question.countDocuments(query),
+]);
+```
+
+2. **Save + Update Stats:**
+
+```javascript
+// ❌ Sequential
+await question.save();
+await subject.updateStats();
+
+// ✅ Parallel
+await Promise.all([question.save(), subject.updateStats()]);
+```
+
+3. **Multiple Independent Validations:**
+
+```javascript
+// ❌ Sequential
+const user = await User.findById(userId);
+const subject = await Subject.findById(subjectId);
+const permissions = await checkPermissions(userId);
+
+// ✅ Parallel
+const [user, subject, permissions] = await Promise.all([
+  User.findById(userId),
+  Subject.findById(subjectId),
+  checkPermissions(userId),
+]);
+```
+
+4. **Population + Stats Updates:**
+
+```javascript
+// ❌ Sequential
+await model.populate([...]);
+await relatedModel.updateStats();
+
+// ✅ Parallel
+await Promise.all([
+    model.populate([...]),
+    relatedModel.updateStats()
+]);
+```
+
+**When NOT to use Promise.all:**
+
+- When one operation depends on the result of another
+- When you need error handling for each operation separately
+- When operations should run in sequence for business logic reasons
+
 ## Critical File Locations
 
 ### Backend Core

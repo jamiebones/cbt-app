@@ -9,7 +9,7 @@ const testSchema = new Schema({
         type: String,
         required: [true, 'Test title is required'],
         trim: true,
-        maxlength: [200, 'Test title cannot exceed 200 characters']
+        maxlength: [500, 'Test title cannot exceed 500 characters']
     },
 
     description: {
@@ -55,18 +55,18 @@ const testSchema = new Schema({
         default: 'manual'
     },
 
+    testTakers: {
+        type: [Schema.Types.ObjectId],
+        ref: 'User',
+        default: []
+    },
+
     // Auto-selection configuration (when questionSelectionMethod is 'auto' or 'mixed')
     autoSelectionConfig: {
-        subjectDistribution: [{
-            subject: {
-                type: Schema.Types.ObjectId,
-                ref: 'Subject'
-            },
-            questionCount: {
-                type: Number,
-                min: 1
-            }
-        }],
+        questionCount: {
+            type: Number,
+            min: 1
+        },
         difficultyDistribution: {
             easy: { type: Number, default: 0 },
             medium: { type: Number, default: 0 },
@@ -126,10 +126,7 @@ const testSchema = new Schema({
                 message: 'End date must be after start date'
             }
         },
-        timeZone: {
-            type: String,
-            default: 'UTC'
-        }
+
     },
 
     // Status and Visibility
@@ -140,11 +137,6 @@ const testSchema = new Schema({
             message: 'Invalid test status'
         },
         default: 'draft'
-    },
-
-    isPublic: {
-        type: Boolean,
-        default: false
     },
 
     // Access Control
@@ -168,10 +160,11 @@ const testSchema = new Schema({
         required: [true, 'Test creator is required']
     },
 
-    subjects: [{
+    subject: {
         type: Schema.Types.ObjectId,
-        ref: 'Subject'
-    }],
+        ref: 'Subject',
+        required: [true, 'Test subject is required']
+    },
 
     // Questions (for manual selection)
     questions: [{
@@ -203,18 +196,6 @@ const testSchema = new Schema({
         }
     },
 
-    // Metadata
-    tags: [{
-        type: String,
-        trim: true,
-        maxlength: [50, 'Tag cannot exceed 50 characters']
-    }],
-
-    version: {
-        type: Number,
-        default: 1
-    },
-
     lastModified: {
         type: Date,
         default: Date.now
@@ -237,7 +218,7 @@ testSchema.index({ testCenterOwner: 1, status: 1 });
 testSchema.index({ createdBy: 1 });
 testSchema.index({ 'schedule.startDate': 1, 'schedule.endDate': 1 });
 testSchema.index({ status: 1, isPublic: 1 });
-testSchema.index({ subjects: 1 });
+testSchema.index({ subject: 1 });
 testSchema.index({ createdAt: -1 });
 testSchema.index({ title: 'text', description: 'text' }); // Text search
 
@@ -271,9 +252,7 @@ testSchema.virtual('hasValidQuestionCount').get(function () {
         return this.questions.length === this.totalQuestions;
     }
     if (this.questionSelectionMethod === 'auto') {
-        const totalAutoQuestions = this.autoSelectionConfig.subjectDistribution
-            .reduce((sum, dist) => sum + dist.questionCount, 0);
-        return totalAutoQuestions === this.totalQuestions;
+        return this.autoSelectionConfig.questionCount === this.totalQuestions;
     }
     return true; // Mixed method is validated separately
 });
@@ -285,8 +264,8 @@ testSchema.pre('save', function (next) {
 
     // Validate question selection configuration
     if (this.questionSelectionMethod === 'auto' || this.questionSelectionMethod === 'mixed') {
-        if (!this.autoSelectionConfig.subjectDistribution.length) {
-            next(new Error('Auto selection requires subject distribution configuration'));
+        if (!this.autoSelectionConfig.questionCount || this.autoSelectionConfig.questionCount <= 0) {
+            next(new Error('Auto selection requires question count configuration'));
             return;
         }
     }
@@ -297,14 +276,14 @@ testSchema.pre('save', function (next) {
             accessCode: this.accessCode,
             _id: { $ne: this._id },
             testCenterOwner: this.testCenterOwner
-        }, (err, test) => {
-            if (err) {
-                next(err);
-            } else if (test) {
+        }).then(test => {
+            if (test) {
                 next(new Error('Access code must be unique within test center'));
             } else {
                 next();
             }
+        }).catch(err => {
+            next(err);
         });
         return;
     }
@@ -323,27 +302,30 @@ testSchema.methods.canBeStarted = function () {
 
 testSchema.methods.getSelectedQuestions = async function () {
     if (this.questionSelectionMethod === 'manual') {
-        return await this.populate('questions').questions;
+        await this.populate('questions');
+        return this.questions;
     }
 
     if (this.questionSelectionMethod === 'auto') {
-        // Implement auto-selection logic
+        // Implement auto-selection logic for single subject
         const Question = mongoose.model('Question');
-        const selectedQuestions = [];
+        const questions = await Question.aggregate([
+            {
+                $match: {
+                    subject: this.subject,
+                    testCenterOwner: this.testCenterOwner,
+                    isActive: true
+                }
+            },
+            { $sample: { size: this.totalQuestions } }
+        ]);
 
-        for (const distribution of this.autoSelectionConfig.subjectDistribution) {
-            const questions = await Question.aggregate([
-                { $match: { subject: distribution.subject, testCenterOwner: this.testCenterOwner } },
-                { $sample: { size: distribution.questionCount } }
-            ]);
-            selectedQuestions.push(...questions);
-        }
-
-        return selectedQuestions;
+        return questions;
     }
 
     // Mixed method - combine manual and auto
-    const manualQuestions = await this.populate('questions').questions;
+    await this.populate('questions');
+    const manualQuestions = this.questions;
     const autoCount = this.totalQuestions - manualQuestions.length;
 
     if (autoCount > 0) {
@@ -352,8 +334,9 @@ testSchema.methods.getSelectedQuestions = async function () {
             {
                 $match: {
                     _id: { $nin: this.questions },
-                    subject: { $in: this.subjects },
-                    testCenterOwner: this.testCenterOwner
+                    subject: this.subject,
+                    testCenterOwner: this.testCenterOwner,
+                    isActive: true
                 }
             },
             { $sample: { size: autoCount } }
@@ -388,6 +371,37 @@ testSchema.methods.updateStats = function (sessionResults) {
     return this.save();
 };
 
+// New method to update stats from TestSession
+testSchema.methods.updateStatsFromSession = async function (sessionId) {
+    const TestSession = mongoose.model('TestSession');
+    const session = await TestSession.findById(sessionId);
+
+    if (!session) return this;
+
+    this.stats.totalAttempts += 1;
+
+    if (session.status === 'completed') {
+        this.stats.completedAttempts += 1;
+        const score = session.score;
+
+        // Update score statistics
+        if (this.stats.completedAttempts === 1) {
+            this.stats.averageScore = score;
+            this.stats.highestScore = score;
+            this.stats.lowestScore = score;
+        } else {
+            this.stats.averageScore = (
+                (this.stats.averageScore * (this.stats.completedAttempts - 1)) + score
+            ) / this.stats.completedAttempts;
+
+            this.stats.highestScore = Math.max(this.stats.highestScore, score);
+            this.stats.lowestScore = Math.min(this.stats.lowestScore, score);
+        }
+    }
+
+    return this.save();
+};
+
 // Static methods
 testSchema.statics.findByOwner = function (ownerId, options = {}) {
     const query = { testCenterOwner: ownerId };
@@ -402,7 +416,7 @@ testSchema.statics.findByOwner = function (ownerId, options = {}) {
 
     return this.find(query)
         .populate('createdBy', 'firstName lastName')
-        .populate('subjects', 'name')
+        .populate('subject', 'name')
         .sort(options.sort || { createdAt: -1 })
         .limit(options.limit || 50)
         .skip(options.skip || 0);
@@ -415,12 +429,12 @@ testSchema.statics.findActiveTests = function (ownerId) {
         status: 'published',
         'schedule.startDate': { $lte: now },
         'schedule.endDate': { $gte: now }
-    }).populate('subjects', 'name');
+    }).populate('subject', 'name');
 };
 
 testSchema.statics.getTestStats = function (ownerId) {
     return this.aggregate([
-        { $match: { testCenterOwner: mongoose.Types.ObjectId(ownerId) } },
+        { $match: { testCenterOwner: new mongoose.Types.ObjectId(ownerId) } },
         {
             $group: {
                 _id: '$status',

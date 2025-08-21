@@ -1,4 +1,4 @@
-module.exports = {
+export default {
     testEnvironment: 'node',
     testMatch: ['**/src/tests/**/*.test.js'],
     collectCoverageFrom: [
@@ -10,5 +10,14 @@ module.exports = {
     coverageReporters: ['text', 'lcov', 'html'],
     setupFilesAfterEnv: ['<rootDir>/src/tests/setup.js'],
     testTimeout: 10000,
-    verbose: true
+    verbose: true,
+    extensionsToTreatAsEsm: ['.js'],
+    globals: {
+        'ts-jest': {
+            useESM: true
+        }
+    },
+    moduleNameMapping: {
+        '^(\\.{1,2}/.*)\\.js$': '$1'
+    }
 };

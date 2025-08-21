@@ -186,7 +186,7 @@ const questionSchema = new Schema({
     timestamps: true,
     toJSON: {
         virtuals: true,
-        transform: function(doc, ret) {
+        transform: function (doc, ret) {
             delete ret.__v;
             return ret;
         }
@@ -204,13 +204,13 @@ questionSchema.index({ createdAt: -1 });
 questionSchema.index({ questionText: 'text', explanation: 'text' }); // Text search
 
 // Virtual for correct answer percentage
-questionSchema.virtual('correctPercentage').get(function() {
+questionSchema.virtual('correctPercentage').get(function () {
     if (this.stats.totalAttempts === 0) return 0;
     return Math.round((this.stats.correctAttempts / this.stats.totalAttempts) * 100);
 });
 
 // Virtual for difficulty score (based on correct percentage)
-questionSchema.virtual('difficultyScore').get(function() {
+questionSchema.virtual('difficultyScore').get(function () {
     const percentage = this.correctPercentage;
     if (percentage >= 80) return 'easy';
     if (percentage >= 50) return 'medium';
@@ -218,29 +218,29 @@ questionSchema.virtual('difficultyScore').get(function() {
 });
 
 // Virtual for media check
-questionSchema.virtual('hasMedia').get(function() {
+questionSchema.virtual('hasMedia').get(function () {
     return !!(this.media.image || this.media.audio || this.media.video);
 });
 
 // Pre-save middleware
-questionSchema.pre('save', function(next) {
+questionSchema.pre('save', function (next) {
     // Update lastModified timestamp
     this.lastModified = new Date();
-    
+
     // Validate answers based on question type
     if (this.type === 'multiple_choice') {
         if (!this.answers || this.answers.length < 2) {
             next(new Error('Multiple choice questions must have at least 2 answer options'));
             return;
         }
-        
+
         const correctAnswers = this.answers.filter(answer => answer.isCorrect);
         if (correctAnswers.length !== 1) {
             next(new Error('Multiple choice questions must have exactly one correct answer'));
             return;
         }
     }
-    
+
     if (this.type === 'true_false') {
         if (!this.correctAnswer || !['true', 'false'].includes(this.correctAnswer.toLowerCase())) {
             next(new Error('True/false questions must have correct answer as "true" or "false"'));
@@ -259,7 +259,7 @@ questionSchema.pre('save', function(next) {
 });
 
 // Instance methods
-questionSchema.methods.checkAnswer = function(studentAnswer) {
+questionSchema.methods.checkAnswer = function (studentAnswer) {
     if (!studentAnswer) {
         return { isCorrect: false, score: 0 };
     }
@@ -283,7 +283,7 @@ questionSchema.methods.checkAnswer = function(studentAnswer) {
         //         this.correctAnswer.trim().toLowerCase() === normalizedStudentAnswer) {
         //         isCorrect = true;
         //     }
-            
+
         //     // Check against acceptable alternatives
         //     if (!isCorrect && this.acceptableAnswers && this.acceptableAnswers.length > 0) {
         //         isCorrect = this.acceptableAnswers.some(answer => 
@@ -301,51 +301,90 @@ questionSchema.methods.checkAnswer = function(studentAnswer) {
     return { isCorrect, score, maxPoints: this.points };
 };
 
-questionSchema.methods.updateStats = function(isCorrect) {
+questionSchema.methods.updateStats = function (isCorrect) {
     this.stats.totalAttempts += 1;
     if (isCorrect) {
         this.stats.correctAttempts += 1;
     }
-    
+
     // Recalculate average score
-    this.stats.averageScore = this.stats.totalAttempts > 0 
-        ? (this.stats.correctAttempts / this.stats.totalAttempts) * 100 
+    this.stats.averageScore = this.stats.totalAttempts > 0
+        ? (this.stats.correctAttempts / this.stats.totalAttempts) * 100
         : 0;
-    
+
     return this.save();
 };
 
-questionSchema.methods.incrementUsage = function() {
+questionSchema.methods.incrementUsage = function () {
     this.stats.timesUsed += 1;
     return this.save();
 };
 
+// Duplicate question method
+questionSchema.methods.duplicate = function (newOwnerId = null) {
+    const duplicatedQuestion = new this.constructor({
+        questionText: this.questionText,
+        explanation: this.explanation,
+        type: this.type,
+        difficulty: this.difficulty,
+        points: this.points,
+        answers: this.answers.map(answer => ({
+            id: answer.id,
+            text: answer.text,
+            image: answer.image,
+            isCorrect: answer.isCorrect
+        })),
+        correctAnswer: this.correctAnswer,
+        acceptableAnswers: this.acceptableAnswers ? [...this.acceptableAnswers] : undefined,
+        subject: this.subject,
+        keywords: this.keywords ? [...this.keywords] : [],
+        topic: this.topic,
+        media: {
+            image: this.media?.image,
+            audio: this.media?.audio,
+            video: this.media?.video
+        },
+        testCenterOwner: newOwnerId || this.testCenterOwner,
+        createdBy: this.createdBy,
+        isPublic: false,
+        isActive: true,
+        stats: {
+            timesUsed: 0,
+            averageScore: 0,
+            totalAttempts: 0,
+            correctAttempts: 0
+        },
+        version: 1
+    });
+
+    return duplicatedQuestion;
+};
 
 
 // Static methods
-questionSchema.statics.findByOwner = function(ownerId, options = {}) {
+questionSchema.statics.findByOwner = function (ownerId, options = {}) {
     const query = { testCenterOwner: ownerId, isActive: true };
-    
+
     if (options.subject) {
         query.subject = options.subject;
     }
-    
+
     if (options.type) {
         query.type = options.type;
     }
-    
+
     if (options.difficulty) {
         query.difficulty = options.difficulty;
     }
-    
+
     if (options.search) {
         query.$text = { $search: options.search };
     }
-    
+
     if (options.keywords && options.keywords.length > 0) {
         query.keywords = { $in: options.keywords };
     }
-    
+
     return this.find(query)
         .populate('subject', 'name')
         .populate('createdBy', 'firstName lastName')
@@ -354,53 +393,72 @@ questionSchema.statics.findByOwner = function(ownerId, options = {}) {
         .skip(options.skip || 0);
 };
 
-questionSchema.statics.findBySubject = function(subjectId, ownerId, options = {}) {
-    const query = { 
-        subject: subjectId, 
+questionSchema.statics.findBySubject = function (subjectId, ownerId, options = {}) {
+    const query = {
+        subject: subjectId,
         testCenterOwner: ownerId,
-        isActive: true 
+        isActive: true
     };
-    
+
     if (options.difficulty) {
         query.difficulty = options.difficulty;
     }
-    
+
     if (options.type) {
         query.type = options.type;
     }
-    
+
     return this.find(query)
         .populate('createdBy', 'firstName lastName')
         .sort(options.sort || { createdAt: -1 })
         .limit(options.limit || 100);
 };
 
-questionSchema.statics.getRandomQuestions = function(criteria) {
-    const { subjectId, ownerId, count, difficulty, excludeIds = [] } = criteria;
-    
-    const pipeline = [
+questionSchema.statics.getRandomQuestions = function (criteria) {
+    const { subjectId, ownerId, count, difficulty, type, excludeIds = [] } = criteria;
+
+    const matchStage = {
+        $match: {
+            subject: new mongoose.Types.ObjectId(subjectId),
+            testCenterOwner: new mongoose.Types.ObjectId(ownerId),
+            isActive: true,
+            _id: { $nin: excludeIds.map(id => new mongoose.Types.ObjectId(id)) }
+        }
+    };
+
+    if (difficulty) {
+        matchStage.$match.difficulty = difficulty;
+    }
+
+    if (type) {
+        matchStage.$match.type = type;
+    }
+
+    return this.aggregate([
+        matchStage,
+        { $sample: { size: count } },
         {
-            $match: {
-                subject: mongoose.Types.ObjectId(subjectId),
-                testCenterOwner: mongoose.Types.ObjectId(ownerId),
-                isActive: true,
-                _id: { $nin: excludeIds.map(id => mongoose.Types.ObjectId(id)) }
+            $lookup: {
+                from: 'subjects',
+                localField: 'subject',
+                foreignField: '_id',
+                as: 'subject'
+            }
+        },
+        {
+            $lookup: {
+                from: 'users',
+                localField: 'createdBy',
+                foreignField: '_id',
+                as: 'createdBy'
             }
         }
-    ];
-    
-    if (difficulty) {
-        pipeline[0].$match.difficulty = difficulty;
-    }
-    
-    pipeline.push({ $sample: { size: count } });
-    
-    return this.aggregate(pipeline);
+    ]);
 };
 
-questionSchema.statics.getQuestionStats = function(ownerId) {
+questionSchema.statics.getQuestionStats = function (ownerId) {
     return this.aggregate([
-        { $match: { testCenterOwner: mongoose.Types.ObjectId(ownerId), isActive: true } },
+        { $match: { testCenterOwner: new mongoose.Types.ObjectId(ownerId), isActive: true } },
         {
             $group: {
                 _id: {
@@ -424,7 +482,7 @@ questionSchema.statics.getQuestionStats = function(ownerId) {
     ]);
 };
 
-questionSchema.statics.bulkImport = function(questionsData, ownerId, createdBy, batchId) {
+questionSchema.statics.bulkImport = function (questionsData, ownerId, createdBy, batchId) {
     const questions = questionsData.map(data => ({
         ...data,
         testCenterOwner: ownerId,
@@ -437,10 +495,9 @@ questionSchema.statics.bulkImport = function(questionsData, ownerId, createdBy, 
             correctAttempts: 0
         }
     }));
-    
+
     return this.insertMany(questions, { ordered: false });
 };
 
 const Question = mongoose.model('Question', questionSchema);
-
 export default Question;

@@ -36,16 +36,18 @@ class TestService {
 
             if (!validOwnerRelation) {
                 throw new Error('User does not have permission to create tests for this test center');
-            }            // Validate subjects exist and belong to the owner
-            if (testData.subjects && testData.subjects.length > 0) {
-                const subjects = await Subject.find({
-                    _id: { $in: testData.subjects },
+            }
+
+            // Validate subject exists and belongs to the owner
+            if (testData.subject) {
+                const subject = await Subject.findOne({
+                    _id: testData.subject,
                     testCenterOwner: ownerId,
                     isActive: true
                 });
 
-                if (subjects.length !== testData.subjects.length) {
-                    throw new Error('One or more subjects are invalid or do not belong to this test center');
+                if (!subject) {
+                    throw new Error('Subject is invalid or does not belong to this test center');
                 }
             }
 
@@ -62,7 +64,7 @@ class TestService {
             // Populate related fields for response
             await test.populate([
                 { path: 'createdBy', select: 'firstName lastName email' },
-                { path: 'subjects', select: 'name code color' }
+                { path: 'subject', select: 'name code color' }
             ]);
 
             this.logger.info(`Test created successfully: ${test._id}`);
@@ -102,7 +104,7 @@ class TestService {
             const total = await Test.countDocuments({
                 testCenterOwner: ownerId,
                 ...(status && { status }),
-                ...(subject && { subjects: subject })
+                ...(subject && { subject: subject })
             });
 
             return {
@@ -131,7 +133,7 @@ class TestService {
                 testCenterOwner: ownerId
             }).populate([
                 { path: 'createdBy', select: 'firstName lastName email' },
-                { path: 'subjects', select: 'name code color' },
+                { path: 'subject', select: 'name code color' },
                 { path: 'questions', select: 'questionText type difficulty points' }
             ]);
 
@@ -173,16 +175,16 @@ class TestService {
                 }
             }
 
-            // Validate subjects if being updated
-            if (updateData.subjects) {
-                const subjects = await Subject.find({
-                    _id: { $in: updateData.subjects },
+            // Validate subject if being updated
+            if (updateData.subject) {
+                const subject = await Subject.findOne({
+                    _id: updateData.subject,
                     testCenterOwner: ownerId,
                     isActive: true
                 });
 
-                if (subjects.length !== updateData.subjects.length) {
-                    throw new Error('One or more subjects are invalid');
+                if (!subject) {
+                    throw new Error('Subject is invalid or does not belong to this test center');
                 }
             }
 
@@ -193,7 +195,7 @@ class TestService {
             // Populate and return updated test
             await test.populate([
                 { path: 'createdBy', select: 'firstName lastName email' },
-                { path: 'subjects', select: 'name code color' }
+                { path: 'subject', select: 'name code color' }
             ]);
 
             this.logger.info(`Test updated successfully: ${testId}`);

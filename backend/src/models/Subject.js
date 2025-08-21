@@ -9,11 +9,12 @@ const subjectSchema = new Schema({
         type: String,
         required: [true, 'Subject name is required'],
         trim: true,
-        maxlength: [100, 'Subject name cannot exceed 100 characters']
+        maxlength: [500, 'Subject name cannot exceed 500 characters']
     },
 
     code: {
         type: String,
+        required: [true, 'Subject code is required'],
         trim: true,
         uppercase: true,
         maxlength: [20, 'Subject code cannot exceed 20 characters'],
@@ -32,25 +33,12 @@ const subjectSchema = new Schema({
     },
 
     // Categorization
-    category: {
-        type: String,
-        trim: true,
-        maxlength: [50, 'Category cannot exceed 50 characters'],
-        default: 'General'
-    },
-
-    // Color coding for UI
-    color: {
-        type: String,
-        trim: true,
-        default: '#3B82F6', // Blue
-        validate: {
-            validator: function (color) {
-                return /^#[0-9A-F]{6}$/i.test(color);
-            },
-            message: 'Color must be a valid hex color code'
-        }
-    },
+    // category: {
+    //     type: String,
+    //     trim: true,
+    //     maxlength: [50, 'Category cannot exceed 50 characters'],
+    //     default: 'General'
+    // },
 
     // Ownership
     testCenterOwner: {
@@ -95,13 +83,6 @@ const subjectSchema = new Schema({
         }
     },
 
-    // Metadata
-    tags: [{
-        type: String,
-        trim: true,
-        maxlength: [30, 'Tag cannot exceed 30 characters']
-    }]
-
 }, {
     timestamps: true,
     toJSON: {
@@ -133,55 +114,45 @@ subjectSchema.virtual('displayName').get(function () {
     return this.name;
 });
 
-// Virtual for color contrast (for text readability)
-subjectSchema.virtual('textColor').get(function () {
-    // Calculate if we need dark or light text based on background color
-    const hex = this.color.replace('#', '');
-    const r = parseInt(hex.substring(0, 2), 16);
-    const g = parseInt(hex.substring(2, 4), 16);
-    const b = parseInt(hex.substring(4, 6), 16);
-    const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-    return brightness > 128 ? '#000000' : '#FFFFFF';
-});
 
 // Pre-save middleware
-subjectSchema.pre('save', async function (next) {
-    // Auto-generate code if not provided
-    if (!this.code && this.isNew) {
-        const baseCode = this.name
-            .toUpperCase()
-            .replace(/[^A-Z0-9]/g, '')
-            .substring(0, 6);
+// subjectSchema.pre('save', async function (next) {
+//     // Auto-generate code if not provided
+//     if (!this.code && this.isNew) {
+//         const baseCode = this.name
+//             .toUpperCase()
+//             .replace(/[^A-Z0-9]/g, '')
+//             .substring(0, 6);
 
-        // Check for uniqueness and add number if needed
-        let code = baseCode;
-        let counter = 1;
-        let isUnique = false;
+//         // Check for uniqueness and add number if needed
+//         let code = baseCode;
+//         let counter = 1;
+//         let isUnique = false;
 
-        while (!isUnique && counter <= 99) {
-            const existing = await this.constructor.findOne({
-                testCenterOwner: this.testCenterOwner,
-                code: code,
-                _id: { $ne: this._id }
-            });
+//         while (!isUnique && counter <= 99) {
+//             const existing = await this.constructor.findOne({
+//                 testCenterOwner: this.testCenterOwner,
+//                 code: code,
+//                 _id: { $ne: this._id }
+//             });
 
-            if (!existing) {
-                isUnique = true;
-                this.code = code;
-            } else {
-                code = `${baseCode}${counter}`;
-                counter++;
-            }
-        }
+//             if (!existing) {
+//                 isUnique = true;
+//                 this.code = code;
+//             } else {
+//                 code = `${baseCode}${counter}`;
+//                 counter++;
+//             }
+//         }
 
-        if (!isUnique) {
-            // Fallback to timestamp-based code
-            this.code = `${baseCode}${Date.now().toString().slice(-4)}`;
-        }
-    }
+//         if (!isUnique) {
+//             // Fallback to timestamp-based code
+//             this.code = `${baseCode}${Date.now().toString().slice(-4)}`;
+//         }
+//     }
 
-    next();
-});
+//     next();
+// });
 
 // Post-save middleware to update stats
 subjectSchema.post('save', async function (doc) {
@@ -306,7 +277,7 @@ subjectSchema.statics.getCategories = function (ownerId) {
 
 subjectSchema.statics.getSubjectStats = function (ownerId) {
     return this.aggregate([
-        { $match: { testCenterOwner: mongoose.Types.ObjectId(ownerId), isActive: true } },
+        { $match: { testCenterOwner: new mongoose.Types.ObjectId(ownerId), isActive: true } },
         {
             $group: {
                 _id: '$category',
@@ -323,7 +294,7 @@ subjectSchema.statics.bulkUpdateOrder = function (ownerId, orderUpdates) {
     const bulkOps = orderUpdates.map(update => ({
         updateOne: {
             filter: {
-                _id: mongoose.Types.ObjectId(update.id),
+                _id: new mongoose.Types.ObjectId(update.id),
                 testCenterOwner: ownerId
             },
             update: { $set: { order: update.order } }
@@ -333,28 +304,7 @@ subjectSchema.statics.bulkUpdateOrder = function (ownerId, orderUpdates) {
     return this.bulkWrite(bulkOps);
 };
 
-subjectSchema.statics.createDefault = async function (ownerId, createdBy) {
-    const defaultSubjects = [
-        { name: 'Mathematics', category: 'STEM', color: '#3B82F6', order: 1 },
-        { name: 'English Language', category: 'Language', color: '#10B981', order: 2 },
-        { name: 'Science', category: 'STEM', color: '#8B5CF6', order: 3 },
-        { name: 'Social Studies', category: 'Humanities', color: '#F59E0B', order: 4 },
-        { name: 'General Knowledge', category: 'General', color: '#EF4444', order: 5 }
-    ];
 
-    const subjects = defaultSubjects.map(subject => ({
-        ...subject,
-        testCenterOwner: ownerId,
-        createdBy: createdBy,
-        stats: {
-            questionCount: 0,
-            testCount: 0,
-            averageDifficulty: 'medium'
-        }
-    }));
-
-    return this.insertMany(subjects, { ordered: false });
-};
 
 const Subject = mongoose.model('Subject', subjectSchema);
 

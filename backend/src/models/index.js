@@ -3,11 +3,13 @@ import User from './User.js';
 import Test from './Test.js';
 import Question from './Question.js';
 import Subject from './Subject.js';
+import TestSession from './TestSession.js';
 
 export {
     User,
     Test,
     Question,
-    Subject
+    Subject,
+    TestSession
 };
 
