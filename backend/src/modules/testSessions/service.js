@@ -2,49 +2,80 @@ import { TestSession, Test, Question } from '../../models/index.js';
 import { logger } from '../../config/logger.js';
 
 class TestSessionService {
-    constructor() {
-        this.logger = logger;
-    }
-
-    // Create a new test session
+    // Create a new test session or resume existing one
     async createSession(testId, studentId, browserInfo = {}, accessCode = null) {
-        this.logger.info(`Creating test session for test: ${testId}, student: ${studentId}`);
+        logger.info(`Creating test session for test: ${testId}, student: ${studentId}`);
 
         try {
-            // Verify test exists and is available
-            const test = await Test.findById(testId).populate('subject');
+            // Parallel execution for better performance
+            const [test, existingSession] = await Promise.all([
+                Test.findById(testId).populate('subject'),
+                TestSession.findOne({
+                    test: testId,
+                    student: studentId,
+                    status: 'in_progress'
+                })
+            ]);
+
             if (!test) {
                 throw new Error('Test not found');
+            }
+
+            // Validate access code if test requires one
+            if (test.accessCode) {
+                if (!accessCode) {
+                    throw new Error('Access code is required for this test');
+                }
+                if (test.accessCode !== accessCode) {
+                    throw new Error('Invalid access code');
+                }
             }
 
             if (!test.canBeStarted()) {
                 throw new Error('Test cannot be started at this time');
             }
 
-            // Check if student already has an active session for this test
-            const existingSession = await TestSession.findOne({
-                test: testId,
-                student: studentId,
-                status: { $in: ['in_progress'] }
-            });
-
+            // Resume existing session with preserved state
             if (existingSession) {
-                this.logger.info(`Resuming existing session: ${existingSession._id}`);
-                return existingSession;
+                logger.info(`Resuming existing session: ${existingSession._id}`);
+
+                // Calculate remaining time based on test duration and elapsed time
+                const now = new Date();
+                const elapsedTime = Math.floor((now - existingSession.startTime) / 1000); // seconds
+                const totalTestDuration = test.duration * 60; // convert minutes to seconds
+                const timeRemaining = Math.max(0, totalTestDuration - elapsedTime);
+
+                // Update browser info if changed
+                existingSession.browserInfo = {
+                    ...existingSession.browserInfo,
+                    userAgent: browserInfo?.userAgent || existingSession.browserInfo.userAgent,
+                    ipAddress: browserInfo?.ipAddress || existingSession.browserInfo.ipAddress,
+                    screenResolution: browserInfo?.screenResolution || existingSession.browserInfo.screenResolution
+                };
+
+                await existingSession.save();
+
+                return {
+                    ...existingSession.toObject(),
+                    resumedSession: true,
+                    timeRemaining,
+                    currentQuestionIndex: existingSession.currentQuestionIndex || 0,
+                    savedAnswers: existingSession.answers || []
+                };
             }
 
-            // Get questions for the test
+            // Get questions for new session
             const questions = await test.getSelectedQuestions();
 
-            // Create new session
+            // Create new session with enhanced tracking
             const session = new TestSession({
                 test: testId,
                 student: studentId,
-                questions: questions.map(q => q._id), // Store question IDs
+                questions: questions.map(q => q._id),
                 totalQuestions: questions.length,
                 testCenterOwner: test.testCenterOwner,
                 startTime: new Date(),
-                endTime: new Date(Date.now() + (test.duration * 60 * 1000)), // Add test duration
+                endTime: new Date(Date.now() + (test.duration * 60 * 1000)),
                 accessCodeUsed: accessCode,
                 browserInfo: {
                     userAgent: browserInfo?.userAgent || '',
@@ -55,19 +86,21 @@ class TestSessionService {
 
             await session.save();
 
-            this.logger.info(`Test session created successfully: ${session._id}`);
-            return session;
+            logger.info(`Test session created successfully: ${session._id}`);
+            return {
+                ...session.toObject(),
+                resumedSession: false
+            };
 
         } catch (error) {
-            this.logger.error('Failed to create test session:', error);
+            logger.error('Failed to create test session:', error);
             throw error;
         }
     }
 
     // Get session by ID with populated data
     async getSessionById(sessionId, studentId = null) {
-        this.logger.info(`Getting session: ${sessionId}`);
-
+        logger.info(`Getting session: ${sessionId}`);
         try {
             const query = { _id: sessionId };
             if (studentId) {
@@ -79,21 +112,20 @@ class TestSessionService {
                 .populate('student', 'firstName lastName email');
 
             if (!session) {
-                throw new Error('Session not found or access denied');
+                throw new Error('Session not found');
             }
 
             return session;
 
         } catch (error) {
-            this.logger.error('Failed to get session:', error);
+            logger.error('Failed to get session:', error);
             throw error;
         }
     }
 
-    // Submit answer for a question
-    async submitAnswer(sessionId, questionId, answer, timeSpent = 0, studentId = null) {
-        this.logger.info(`Submitting answer for session: ${sessionId}, question: ${questionId}`);
-
+    // Submit answer for a question with enhanced state tracking
+    async submitAnswer(sessionId, questionId, answer, timeSpent = 0, studentId = null, questionIndex = null) {
+        logger.info(`Submitting answer for session: ${sessionId}, question: ${questionId}`);
         try {
             const query = { _id: sessionId, status: 'in_progress' };
             if (studentId) {
@@ -102,24 +134,152 @@ class TestSessionService {
 
             const session = await TestSession.findOne(query);
             if (!session) {
-                throw new Error('Session not found, completed, or access denied');
+                throw new Error('Session not found or completed');
             }
 
-            // Submit the answer
-            await session.submitAnswer(questionId, answer, timeSpent);
+            // Calculate remaining time
+            const now = new Date();
+            //const elapsedTime = Math.floor((now - session.startTime) / 1000);
+            const timeRemaining = Math.max(0, session.timeRemaining - timeSpent);
 
-            this.logger.info(`Answer submitted successfully for session: ${sessionId}`);
-            return session;
+            // Find existing answer or create new one
+            const existingAnswerIndex = session.answers.findIndex(
+                a => a.questionId.equals(questionId)
+            );
+
+            const answerData = {
+                questionId,
+                selectedAnswer: answer,
+                timeSpent: timeSpent,
+                answeredAt: now,
+                flaggedForReview: false
+            };
+
+            if (existingAnswerIndex >= 0) {
+                // Update existing answer
+                session.answers[existingAnswerIndex] = {
+                    ...session.answers[existingAnswerIndex],
+                    ...answerData,
+                    timeSpent: session.answers[existingAnswerIndex].timeSpent + timeSpent
+                };
+            } else {
+                // Add new answer
+                session.answers.push(answerData);
+            }
+
+            // Update session progress
+            session.timeRemaining = timeRemaining;
+            session.lastActiveTime = now;
+
+            // Update current question index if provided
+            if (questionIndex !== null) {
+                session.currentQuestionIndex = questionIndex;
+            }
+
+            // Auto-save progress
+            await session.save();
+
+            logger.info(`Answer submitted and progress saved for session: ${sessionId}`);
+
+            return {
+                success: true,
+                timeRemaining,
+                currentQuestionIndex: session.currentQuestionIndex,
+                totalAnswered: session.answers.length,
+                autoSaved: true
+            };
 
         } catch (error) {
-            this.logger.error('Failed to submit answer:', error);
+            logger.error('Failed to submit answer:', error);
+            throw error;
+        }
+    }
+
+    // Auto-save session progress (called periodically from frontend)
+    async autoSaveProgress(sessionId, currentQuestionIndex, timeRemaining, studentId = null) {
+        logger.info(`Auto-saving progress for session: ${sessionId}`);
+
+        try {
+            const query = { _id: sessionId, status: 'in_progress' };
+            if (studentId) {
+                query.student = studentId;
+            }
+
+            const session = await TestSession.findOneAndUpdate(
+                query,
+                {
+                    currentQuestionIndex,
+                    timeRemaining,
+                    lastActiveTime: new Date()
+                },
+                { new: true }
+            );
+
+            if (!session) {
+                throw new Error('Session not found');
+            }
+
+            return {
+                success: true,
+                lastSaved: new Date(),
+                timeRemaining: session.timeRemaining
+            };
+
+        } catch (error) {
+            logger.error('Failed to auto-save progress:', error);
+            throw error;
+        }
+    }
+
+    // Get session progress and state for resumption
+    async getSessionProgress(sessionId, studentId = null) {
+        logger.info(`Getting session progress: ${sessionId}`);
+
+        try {
+            const query = { _id: sessionId };
+            if (studentId) {
+                query.student = studentId;
+            }
+
+            const session = await TestSession.findOne(query)
+                .populate('test', 'title description duration passingScore')
+                .populate('student', 'firstName lastName email');
+
+            if (!session) {
+                throw new Error('Session not found');
+            }
+
+            // Calculate current time remaining
+            const now = new Date();
+            let timeRemaining = session.timeRemaining;
+
+            if (session.status === 'in_progress') {
+                const lastActiveTime = session.lastActiveTime || session.startTime;
+                const inactiveTime = Math.floor((now - lastActiveTime) / 1000);
+                timeRemaining = Math.max(0, session.timeRemaining - inactiveTime);
+            }
+
+            return {
+                session: session.toObject(),
+                progress: {
+                    currentQuestionIndex: session.currentQuestionIndex || 0,
+                    timeRemaining,
+                    totalQuestions: session.totalQuestions,
+                    answeredQuestions: session.answers.length,
+                    savedAnswers: session.answers,
+                    canResume: session.status === 'in_progress'
+                }
+            };
+
+        } catch (error) {
+            logger.error('Failed to get session progress:', error);
             throw error;
         }
     }
 
     // Complete test session
     async completeSession(sessionId, studentId = null) {
-        this.logger.info(`Completing session: ${sessionId}`);
+        logger.info(`Completing session: ${sessionId}`);
 
         try {
             const query = { _id: sessionId, status: 'in_progress' };
@@ -129,23 +289,23 @@ class TestSessionService {
 
             const session = await TestSession.findOne(query);
             if (!session) {
-                throw new Error('Session not found, already completed, or access denied');
+                throw new Error('Session not found or already completed');
             }
 
             await session.complete();
 
-            this.logger.info(`Session completed successfully: ${sessionId}`);
+            logger.info(`Session completed successfully: ${sessionId}`);
             return session;
 
         } catch (error) {
-            this.logger.error('Failed to complete session:', error);
+            logger.error('Failed to complete session:', error);
             throw error;
         }
     }
 
     // Abandon test session
     async abandonSession(sessionId, studentId = null) {
-        this.logger.info(`Abandoning session: ${sessionId}`);
+        logger.info(`Abandoning session: ${sessionId}`);
 
         try {
             const query = { _id: sessionId, status: 'in_progress' };
@@ -155,23 +315,23 @@ class TestSessionService {
 
             const session = await TestSession.findOne(query);
             if (!session) {
-                throw new Error('Session not found or access denied');
+                throw new Error('Session not found');
             }
 
             await session.abandon();
 
-            this.logger.info(`Session abandoned: ${sessionId}`);
+            logger.info(`Session abandoned: ${sessionId}`);
             return session;
 
         } catch (error) {
-            this.logger.error('Failed to abandon session:', error);
+            logger.error('Failed to abandon session:', error);
             throw error;
         }
     }
 
     // Get sessions for a test (admin)
     async getTestSessions(testId, ownerId, options = {}) {
-        this.logger.info(`Getting sessions for test: ${testId}`);
+        logger.info(`Getting sessions for test: ${testId}`);
 
         try {
             // Verify test ownership
@@ -179,33 +339,32 @@ class TestSessionService {
             if (!test) {
                 throw new Error('Test not found or access denied');
             }
-
             const sessions = await TestSession.findByTest(testId, options);
             return sessions;
 
         } catch (error) {
-            this.logger.error('Failed to get test sessions:', error);
+            logger.error('Failed to get test sessions:', error);
             throw error;
         }
     }
 
     // Get sessions for a student
     async getStudentSessions(studentId, options = {}) {
-        this.logger.info(`Getting sessions for student: ${studentId}`);
+        logger.info(`Getting sessions for student: ${studentId}`);
 
         try {
             const sessions = await TestSession.findByStudent(studentId, options);
             return sessions;
 
         } catch (error) {
-            this.logger.error('Failed to get student sessions:', error);
+            logger.error('Failed to get student sessions:', error);
             throw error;
         }
     }
 
     // Get test analytics (admin)
     async getTestAnalytics(testId, ownerId) {
-        this.logger.info(`Getting analytics for test: ${testId}`);
+        logger.info(`Getting analytics for test: ${testId}`);
 
         try {
             // Verify test ownership
@@ -223,14 +382,14 @@ class TestSessionService {
             };
 
         } catch (error) {
-            this.logger.error('Failed to get test analytics:', error);
+            logger.error('Failed to get test analytics:', error);
             throw error;
         }
     }
 
     // Flag session for review (admin)
     async flagSession(sessionId, ownerId, reason) {
-        this.logger.info(`Flagging session for review: ${sessionId}`);
+        logger.info(`Flagging session for review: ${sessionId}`);
 
         try {
             const session = await TestSession.findOne({
@@ -244,18 +403,18 @@ class TestSessionService {
 
             await session.flagForReview(reason);
 
-            this.logger.info(`Session flagged successfully: ${sessionId}`);
+            logger.info(`Session flagged successfully: ${sessionId}`);
             return session;
 
         } catch (error) {
-            this.logger.error('Failed to flag session:', error);
+            logger.error('Failed to flag session:', error);
             throw error;
         }
     }
 
     // Update admin notes (admin)
     async updateAdminNotes(sessionId, ownerId, notes) {
-        this.logger.info(`Updating admin notes for session: ${sessionId}`);
+        logger.info(`Updating admin notes for session: ${sessionId}`);
 
         try {
             const session = await TestSession.findOneAndUpdate(
@@ -274,32 +433,32 @@ class TestSessionService {
                 throw new Error('Session not found or access denied');
             }
 
-            this.logger.info(`Admin notes updated successfully: ${sessionId}`);
+            logger.info(`Admin notes updated successfully: ${sessionId}`);
             return session;
 
         } catch (error) {
-            this.logger.error('Failed to update admin notes:', error);
+            logger.error('Failed to update admin notes:', error);
             throw error;
         }
     }
 
     // Get owner statistics (admin)
     async getOwnerStats(ownerId) {
-        this.logger.info(`Getting owner statistics: ${ownerId}`);
+        logger.info(`Getting owner statistics: ${ownerId}`);
 
         try {
             const stats = await TestSession.getOwnerStats(ownerId);
             return stats;
 
         } catch (error) {
-            this.logger.error('Failed to get owner stats:', error);
+            logger.error('Failed to get owner stats:', error);
             throw error;
         }
     }
 
     // Auto-expire sessions that have exceeded test duration
     async expireOverdueSessions() {
-        this.logger.info('Checking for overdue sessions to expire');
+        logger.info('Checking for overdue sessions to expire');
 
         try {
             // Find sessions that are in progress and have exceeded their test duration
@@ -317,16 +476,16 @@ class TestSessionService {
                     if (elapsed > maxDuration) {
                         await session.expire();
                         expiredCount++;
-                        this.logger.info(`Expired overdue session: ${session._id}`);
+                        logger.info(`Expired overdue session: ${session._id}`);
                     }
                 }
             }
 
-            this.logger.info(`Expired ${expiredCount} overdue sessions`);
+            logger.info(`Expired ${expiredCount} overdue sessions`);
             return expiredCount;
 
         } catch (error) {
-            this.logger.error('Failed to expire overdue sessions:', error);
+            logger.error('Failed to expire overdue sessions:', error);
             throw error;
         }
     }

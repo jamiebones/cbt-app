@@ -132,9 +132,14 @@ const testSessionSchema = new Schema({
         default: false
     },
 
+    adminNotes: {
+        type: String,
+        maxlength: [1000, 'Admin note cannot exceed 1000 characters']
+    },
+
     flagReason: {
         type: String,
-        maxlength: [1000, 'Flag reason cannot exceed 500 characters'],
+        maxlength: [1000, 'Flag reason cannot exceed 1000 characters'],
         trim: true
     },
 
@@ -293,7 +298,6 @@ testSessionSchema.methods.abandon = function () {
     this.status = 'abandoned';
     this.endTime = new Date();
     this.duration = Math.floor((this.endTime - this.startTime) / 1000);
-
     return this.save();
 };
 

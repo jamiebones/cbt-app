@@ -38,6 +38,16 @@ This is a **monolithic MERN stack** Computer-Based Testing application with Dock
 - Use meaningful comments for complex business logic
 - Prefer readability over cleverness
 
+### Collaborative Development Standards
+
+**When the user suggests an edit or approach:**
+
+- **Always evaluate for better alternatives** - Don't just implement what's suggested
+- **Proactively suggest improvements** - If there's a more optimal, secure, or maintainable approach, recommend it
+- **Explain the trade-offs** - Clearly communicate why an alternative approach might be better
+- **Respect user preferences** - After explaining alternatives, implement what the user prefers
+- **Focus on performance and maintainability** - Prioritize solutions that align with the performance standards above
+
 ## Development Patterns
 
 ### Module Structure (Critical Pattern)
