@@ -11,6 +11,33 @@ This is a **monolithic MERN stack** Computer-Based Testing application with Dock
 - **Role-Based System**: `test_center_owner` → `test_creator` → `student` hierarchy
 - **Subscription Tiers**: Free/premium limits enforced at service layer
 
+## Code Quality & Performance Standards
+
+### Performance Requirements (CRITICAL)
+
+**All code written must be optimal for speed and execution:**
+
+- **Big O Optimization**: Do NOT write code with quadratic (O(n²)) or exponential (O(2ⁿ)) time complexity
+- **Prefer Linear Time**: Aim for O(n) or better time complexity in all algorithms
+- **Database Efficiency**: Use proper indexing, lean queries, and aggregation pipelines
+- **Memory Efficiency**: Avoid unnecessary object creation and memory leaks
+
+### Code Style Standards
+
+**All code should follow the established module pattern:**
+
+- Use the exact module structure defined below
+- Follow singleton pattern for services and controllers
+- Maintain consistent import/export conventions
+- Adhere to ES6 module syntax throughout
+
+**Code should be simplistic and easy to understand:**
+
+- Write self-documenting code with clear variable names
+- Keep functions small and focused on single responsibilities
+- Use meaningful comments for complex business logic
+- Prefer readability over cleverness
+
 ## Development Patterns
 
 ### Module Structure (Critical Pattern)
@@ -264,3 +291,63 @@ Based on current progress, the next major tasks are:
 4. **Analytics & Reporting**: Performance tracking and report generation
 
 When implementing new features, follow the established module pattern and maintain consistency with existing subscription validation and authentication flows.
+
+## Comprehensive Testing Strategy
+
+### Test Structure & Organization
+
+```
+backend/src/tests/
+├── setup.js                    # Global test setup
+├── helpers/                    # Test utilities
+│   ├── testData.js            # Mock data generators
+│   ├── dbHelpers.js           # Database setup/teardown
+│   └── authHelpers.js         # Authentication helpers
+├── unit/                       # Unit tests for services
+│   ├── auth.service.test.js
+│   ├── users.service.test.js
+│   ├── subjects.service.test.js
+│   ├── questions.service.test.js
+│   ├── tests.service.test.js
+│   ├── testSessions.service.test.js
+│   └── subscriptions.service.test.js
+├── integration/                # Integration tests
+│   ├── auth.integration.test.js
+│   ├── questionBank.integration.test.js
+│   └── testWorkflow.integration.test.js
+└── e2e/                       # End-to-end workflow tests
+    └── completeTestFlow.e2e.test.js
+```
+
+### Service Testing Requirements
+
+**For Each Service, Test:**
+
+1. **Happy Path Scenarios** - Normal operations
+2. **Error Handling** - Invalid inputs, not found, permissions
+3. **Edge Cases** - Boundary conditions, empty data
+4. **Security** - Authorization, data sanitization
+5. **Performance** - Parallel operations with Promise.all
+6. **Data Integrity** - Proper saving, relationships
+
+**100% Coverage Goals:**
+
+- Statements: 100%
+- Branches: 100%
+- Functions: 100%
+- Lines: 100%
+
+**Priority Testing Areas:**
+
+1. Authentication Security - JWT, password hashing, rate limiting
+2. Authorization - Role-based access, ownership validation
+3. Data Validation - Input sanitization, schema validation
+4. Business Logic - Subscription limits, test scoring
+5. Error Handling - Graceful failure, proper error messages
+
+### Test Implementation Phases
+
+**Phase 1: Core Services** - AuthService, UsersService, QuestionsService
+**Phase 2: Business Logic** - SubjectsService, TestsService, SubscriptionsService
+**Phase 3: Advanced** - TestSessionsService, Analytics
+**Phase 4: Integration & E2E** - Cross-service workflows, complete user journeys

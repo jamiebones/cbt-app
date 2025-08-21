@@ -2,13 +2,10 @@ import { Subject, Question, Test, User } from '../../models/index.js';
 import { logger } from '../../config/logger.js';
 
 class SubjectService {
-    constructor() {
-        this.logger = logger;
-    }
 
     // Create a new subject
     async createSubject(subjectData, ownerId, createdBy) {
-        this.logger.info(`Creating subject for owner: ${ownerId}`);
+        logger.info(`Creating subject for owner: ${ownerId}`);
 
         try {
             // Validate creator permissions
@@ -25,7 +22,6 @@ class SubjectService {
                 validOwnerRelation = creator.testCenterOwner &&
                     creator.testCenterOwner.toString() === ownerId.toString();
             }
-
             if (!validOwnerRelation) {
                 throw new Error('User does not have permission to create subjects for this test center');
             }
@@ -53,18 +49,18 @@ class SubjectService {
             // Populate creator info for response
             await subject.populate('createdBy', 'firstName lastName email');
 
-            this.logger.info(`Subject created successfully: ${subject._id}`);
+            logger.info(`Subject created successfully: ${subject._id}`);
             return subject;
 
         } catch (error) {
-            this.logger.error('Failed to create subject:', error);
+            logger.error('Failed to create subject:', error);
             throw error;
         }
     }
 
     // Get all subjects for a test center
     async getSubjectsByOwner(ownerId, options = {}) {
-        this.logger.info(`Getting subjects for owner: ${ownerId}`);
+        logger.info(`Getting subjects for owner: ${ownerId}`);
 
         try {
             const {
@@ -103,14 +99,14 @@ class SubjectService {
             };
 
         } catch (error) {
-            this.logger.error('Failed to get subjects:', error);
+            logger.error('Failed to get subjects:', error);
             throw error;
         }
     }
 
     // Get single subject by ID
     async getSubjectById(subjectId, ownerId) {
-        this.logger.info(`Getting subject: ${subjectId} for owner: ${ownerId}`);
+        logger.info(`Getting subject: ${subjectId} for owner: ${ownerId}`);
 
         try {
             const subject = await Subject.findOne({
@@ -139,14 +135,14 @@ class SubjectService {
             };
 
         } catch (error) {
-            this.logger.error('Failed to get subject:', error);
+            logger.error('Failed to get subject:', error);
             throw error;
         }
     }
 
     // Update subject
     async updateSubject(subjectId, updateData, ownerId) {
-        this.logger.info(`Updating subject: ${subjectId}`);
+        logger.info(`Updating subject: ${subjectId}`);
 
         try {
             const subject = await Subject.findOne({
@@ -183,18 +179,18 @@ class SubjectService {
             // Populate for response
             await subject.populate('createdBy', 'firstName lastName email');
 
-            this.logger.info(`Subject updated successfully: ${subjectId}`);
+            logger.info(`Subject updated successfully: ${subjectId}`);
             return subject;
 
         } catch (error) {
-            this.logger.error('Failed to update subject:', error);
+            logger.error('Failed to update subject:', error);
             throw error;
         }
     }
 
     // Delete subject (soft delete)
     async deleteSubject(subjectId, ownerId) {
-        this.logger.info(`Deleting subject: ${subjectId}`);
+        logger.info(`Deleting subject: ${subjectId}`);
 
         try {
             const subject = await Subject.findOne({
@@ -223,64 +219,64 @@ class SubjectService {
                 { isActive: false }
             );
 
-            this.logger.info(`Subject deleted successfully: ${subjectId}`);
+            logger.info(`Subject deleted successfully: ${subjectId}`);
             return { success: true, message: 'Subject deleted successfully' };
 
         } catch (error) {
-            this.logger.error('Failed to delete subject:', error);
+            logger.error('Failed to delete subject:', error);
             throw error;
         }
     }
 
     // Get subject categories
     async getCategories(ownerId) {
-        this.logger.info(`Getting categories for owner: ${ownerId}`);
+        logger.info(`Getting categories for owner: ${ownerId}`);
 
         try {
             const categories = await Subject.getCategories(ownerId);
             return categories;
 
         } catch (error) {
-            this.logger.error('Failed to get categories:', error);
+            logger.error('Failed to get categories:', error);
             throw error;
         }
     }
 
     // Update subject order (for drag-and-drop reordering)
     async updateSubjectOrder(ownerId, orderUpdates) {
-        this.logger.info(`Updating subject order for owner: ${ownerId}`);
+        logger.info(`Updating subject order for owner: ${ownerId}`);
 
         try {
             const result = await Subject.bulkUpdateOrder(ownerId, orderUpdates);
 
-            this.logger.info(`Subject order updated successfully`);
+            logger.info(`Subject order updated successfully`);
             return { success: true, message: 'Subject order updated successfully', modifiedCount: result.modifiedCount };
 
         } catch (error) {
-            this.logger.error('Failed to update subject order:', error);
+            logger.error('Failed to update subject order:', error);
             throw error;
         }
     }
 
     // Create default subjects for new test centers
     async createDefaultSubjects(ownerId, createdBy) {
-        this.logger.info(`Creating default subjects for owner: ${ownerId}`);
+        logger.info(`Creating default subjects for owner: ${ownerId}`);
 
         try {
             const subjects = await Subject.createDefault(ownerId, createdBy);
 
-            this.logger.info(`Default subjects created successfully`);
+            logger.info(`Default subjects created successfully`);
             return subjects;
 
         } catch (error) {
-            this.logger.error('Failed to create default subjects:', error);
+            logger.error('Failed to create default subjects:', error);
             throw error;
         }
     }
 
     // Get subject statistics
     async getSubjectStatistics(ownerId) {
-        this.logger.info(`Getting subject statistics for owner: ${ownerId}`);
+        logger.info(`Getting subject statistics for owner: ${ownerId}`);
 
         try {
             const stats = await Subject.getSubjectStats(ownerId);
@@ -306,7 +302,7 @@ class SubjectService {
             return summary;
 
         } catch (error) {
-            this.logger.error('Failed to get subject statistics:', error);
+            logger.error('Failed to get subject statistics:', error);
             throw error;
         }
     }

@@ -490,7 +490,7 @@ class QuestionBankService {
             });
 
             if (!originalQuestion) {
-                throw new Error('Question not found or access denied');
+                throw new Error('Question not found');
             }
 
             // Create duplicate
@@ -541,10 +541,8 @@ class QuestionBankService {
     // Get question statistics
     async getQuestionStatistics(ownerId) {
         logger.info(`Getting question statistics for owner: ${ownerId}`);
-
         try {
             const stats = await Question.getQuestionStats(ownerId);
-
             const summary = {
                 totalQuestions: 0,
                 byType: {},
