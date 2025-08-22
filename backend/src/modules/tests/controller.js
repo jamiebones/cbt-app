@@ -267,6 +267,58 @@ class TestController {
         });
     };
 
+    // Get test with enrollment information
+    getTestEnrollmentInfo = async (req, res) => {
+        try {
+            logger.info('Get test enrollment info endpoint called');
+            const { id } = req.params;
+            const ownerId = req.user.role === 'test_center_owner'
+                ? req.user._id
+                : req.user.testCenterOwner;
+
+            const result = await this.testService.getTestWithEnrollmentInfo(id, ownerId);
+
+            res.json({
+                success: true,
+                data: result
+            });
+
+        } catch (error) {
+            logger.error('Get test enrollment info failed:', error);
+            res.status(400).json({
+                success: false,
+                message: error.message || 'Failed to get test enrollment info'
+            });
+        }
+    };
+
+    // Update enrollment configuration
+    updateEnrollmentConfig = async (req, res) => {
+        try {
+            logger.info('Update enrollment config endpoint called');
+            const { id } = req.params;
+            const enrollmentConfig = req.body;
+            const ownerId = req.user.role === 'test_center_owner'
+                ? req.user._id
+                : req.user.testCenterOwner;
+
+            const test = await this.testService.updateEnrollmentConfig(id, ownerId, enrollmentConfig);
+
+            res.json({
+                success: true,
+                message: 'Enrollment configuration updated successfully',
+                data: test
+            });
+
+        } catch (error) {
+            logger.error('Update enrollment config failed:', error);
+            res.status(400).json({
+                success: false,
+                message: error.message || 'Failed to update enrollment configuration'
+            });
+        }
+    };
+
     // Start a test session (placeholder for student interface)
     startTest = async (req, res) => {
         logger.info('Start test endpoint called');

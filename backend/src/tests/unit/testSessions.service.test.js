@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import mongoose from 'mongoose';
 import { testSessionService } from '../../modules/testSessions/service.js';
 import { TestSession, Test, Question } from '../../models/index.js';
+import { testEnrollmentService } from '../../modules/testEnrollment/service.js';
 import { createTestData, createTestUser, createTestSession } from '../helpers/testData.js';
 
 const { ObjectId } = mongoose.Types;
@@ -30,6 +31,14 @@ vi.mock('../../models/index.js', () => ({
     }
 }));
 
+// Mock enrollment service
+vi.mock('../../modules/testEnrollment/service.js', () => ({
+    testEnrollmentService: {
+        validateAccessCode: vi.fn(),
+        markAccessCodeUsed: vi.fn()
+    }
+}));
+
 // Mock logger
 vi.mock('../../config/logger.js', () => ({
     logger: {
@@ -49,9 +58,16 @@ describe('TestSessionService - Smart Resume Features', () => {
         mockTest = {
             _id: new ObjectId(),
             title: 'Sample Test',
-            duration: 60, // 60 minutes
-            canBeStarted: vi.fn().mockReturnValue(true),
-            getSelectedQuestions: vi.fn()
+            description: 'Test description',
+            timeLimit: 60,
+            questions: [new ObjectId(), new ObjectId()],
+            isActive: true,
+            enrollmentConfig: {
+                isEnrollmentRequired: false,
+                enrollmentFee: 0,
+                requirePayment: false
+            },
+            canBeStarted: vi.fn().mockReturnValue(true)
         };
 
         mockStudent = createTestUser({ role: 'student' });
@@ -129,6 +145,147 @@ describe('TestSessionService - Smart Resume Features', () => {
             expect(result.savedAnswers).toHaveLength(2);
             expect(result.timeRemaining).toBeGreaterThan(0);
             expect(existingSession.save).toHaveBeenCalled();
+        });
+
+        it('should create new session with enrollment validation', async () => {
+            // Arrange
+            const testWithEnrollment = {
+                ...mockTest,
+                enrollmentConfig: {
+                    isEnrollmentRequired: true,
+                    enrollmentFee: 100,
+                    requirePayment: true
+                }
+            };
+
+            const mockEnrollment = {
+                _id: new ObjectId(),
+                accessCode: 'ABC123DEF',
+                enrollmentStatus: 'enrolled',
+                paymentStatus: 'completed'
+            };
+
+            Test.findById.mockReturnValue({
+                populate: vi.fn().mockResolvedValue(testWithEnrollment)
+            });
+            TestSession.findOne.mockResolvedValue(null);
+            testEnrollmentService.validateAccessCode.mockResolvedValue(mockEnrollment);
+            testEnrollmentService.markAccessCodeUsed.mockResolvedValue(true);
+
+            const newSession = {
+                ...mockSession,
+                enrollment: mockEnrollment._id,
+                save: vi.fn().mockResolvedValue(true)
+            };
+
+            TestSession.mockImplementation(() => newSession);
+
+            // Act
+            const result = await testSessionService.createSession(
+                mockTest._id,
+                mockStudent.id,
+                { accessCode: 'ABC123DEF' }
+            );
+
+            // Assert
+            expect(testEnrollmentService.validateAccessCode).toHaveBeenCalledWith(
+                'ABC123DEF',
+                mockStudent.id,
+                mockTest._id
+            );
+            expect(testEnrollmentService.markAccessCodeUsed).toHaveBeenCalledWith(
+                mockEnrollment._id
+            );
+            expect(result.enrollment).toBe(mockEnrollment._id);
+            expect(result.resumedSession).toBe(false);
+        });
+
+        it('should handle missing access code for enrollment required test', async () => {
+            // Arrange
+            const testWithEnrollment = {
+                ...mockTest,
+                enrollmentConfig: {
+                    isEnrollmentRequired: true,
+                    enrollmentFee: 100,
+                    requirePayment: true
+                }
+            };
+
+            Test.findById.mockReturnValue({
+                populate: vi.fn().mockResolvedValue(testWithEnrollment)
+            });
+            TestSession.findOne.mockResolvedValue(null);
+
+            // Act & Assert
+            await expect(testSessionService.createSession(
+                mockTest._id,
+                mockStudent.id,
+                { userAgent: 'test-browser' }
+            )).rejects.toThrow('Access code is required for this test');
+        });
+
+        it('should handle invalid enrollment access code', async () => {
+            // Arrange
+            const testWithEnrollment = {
+                ...mockTest,
+                enrollmentConfig: {
+                    isEnrollmentRequired: true,
+                    enrollmentFee: 100,
+                    requirePayment: true
+                }
+            };
+
+            Test.findById.mockReturnValue({
+                populate: vi.fn().mockResolvedValue(testWithEnrollment)
+            });
+            TestSession.findOne.mockResolvedValue(null);
+            testEnrollmentService.validateAccessCode.mockRejectedValue(
+                new Error('Invalid access code or unauthorized access')
+            );
+
+            // Act & Assert
+            await expect(testSessionService.createSession(
+                mockTest._id,
+                mockStudent.id,
+                { accessCode: 'INVALID123' }
+            )).rejects.toThrow('Invalid access code or unauthorized access');
+        });
+
+        it('should create session without enrollment for free tests', async () => {
+            // Arrange
+            const freeTest = {
+                ...mockTest,
+                enrollmentConfig: {
+                    isEnrollmentRequired: false,
+                    enrollmentFee: 0,
+                    requirePayment: false
+                }
+            };
+
+            Test.findById.mockReturnValue({
+                populate: vi.fn().mockResolvedValue(freeTest)
+            });
+            TestSession.findOne.mockResolvedValue(null);
+
+            const newSession = {
+                ...mockSession,
+                enrollment: null,
+                save: vi.fn().mockResolvedValue(true)
+            };
+
+            TestSession.mockImplementation(() => newSession);
+
+            // Act
+            const result = await testSessionService.createSession(
+                mockTest._id,
+                mockStudent.id,
+                { userAgent: 'test-browser' }
+            );
+
+            // Assert
+            expect(testEnrollmentService.validateAccessCode).not.toHaveBeenCalled();
+            expect(result.enrollment).toBeNull();
+            expect(result.resumedSession).toBe(false);
         });
 
         it('should calculate correct remaining time on resume', async () => {

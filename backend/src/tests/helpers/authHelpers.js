@@ -131,11 +131,11 @@ export const createRateLimitTestData = () => ({
 
 // Security test helpers
 export const createSecurityTestCases = () => ({
-    sqlInjection: [
-        "'; DROP TABLE users; --",
-        "admin' --",
-        "' OR '1'='1",
-        "' UNION SELECT * FROM users --"
+    mongodbInjection: [
+        '{"$ne": null}',
+        '{"$regex": ".*"}',
+        '{"$where": "this.password.length > 0"}',
+        '{"$or": [{"password": {"$regex": ".*"}}]}'
     ],
     xss: [
         '<script>alert("xss")</script>',

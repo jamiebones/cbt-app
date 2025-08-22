@@ -10,8 +10,10 @@ router.use(authenticate);
 // Test management routes
 router.get('/', testController.getTests);
 router.get('/:id', testController.getTestById);
+router.get('/:id/enrollment-info', testController.getTestEnrollmentInfo);
 router.post('/', testController.createTest);
 router.put('/:id', testController.updateTest);
+router.put('/:id/enrollment-config', testController.updateEnrollmentConfig);
 router.delete('/:id', testController.deleteTest);
 
 // Question management routes

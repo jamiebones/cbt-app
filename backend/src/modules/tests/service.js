@@ -1,4 +1,4 @@
-import { Test, Question, Subject, User } from '../../models/index.js';
+import { Test, Question, Subject, User, TestEnrollment } from '../../models/index.js';
 import { subscriptionService } from '../subscriptions/service.js';
 import { logger } from '../../config/logger.js';
 
@@ -56,7 +56,15 @@ class TestService {
                 ...testData,
                 testCenterOwner: ownerId,
                 createdBy: createdBy,
-                status: 'draft'
+                status: 'draft',
+                enrollmentConfig: testData.enrollmentConfig || {
+                    isEnrollmentRequired: false,
+                    enrollmentFee: 0,
+                    maxEnrollments: -1,
+                    allowLateEnrollment: false,
+                    requirePayment: false,
+                    autoApprove: true
+                }
             });
 
             await test.save();
@@ -353,6 +361,95 @@ class TestService {
         } catch (error) {
             this.logger.error('Failed to count questions:', error);
             return 0;
+        }
+    }
+
+    // Get test with enrollment information
+    async getTestWithEnrollmentInfo(testId, ownerId) {
+        this.logger.info(`Getting test with enrollment info: ${testId}`);
+
+        try {
+            const test = await Test.findOne({
+                _id: testId,
+                testCenterOwner: ownerId
+            }).populate([
+                { path: 'subject', select: 'name code color' },
+                { path: 'createdBy', select: 'firstName lastName email' }
+            ]);
+
+            if (!test) {
+                throw new Error('Test not found or access denied');
+            }
+
+            // Get enrollment statistics if enrollment is enabled
+            let enrollmentStats = null;
+            if (test.enrollmentConfig.isEnrollmentRequired) {
+                enrollmentStats = await TestEnrollment.aggregate([
+                    { $match: { test: testId } },
+                    {
+                        $group: {
+                            _id: '$enrollmentStatus',
+                            count: { $sum: 1 },
+                            revenue: { $sum: '$paymentAmount' }
+                        }
+                    }
+                ]);
+            }
+
+            return {
+                test,
+                enrollmentStats
+            };
+
+        } catch (error) {
+            this.logger.error('Failed to get test with enrollment info:', error);
+            throw error;
+        }
+    }
+
+    // Update enrollment configuration
+    async updateEnrollmentConfig(testId, ownerId, enrollmentConfig) {
+        this.logger.info(`Updating enrollment config for test: ${testId}`);
+
+        try {
+            const test = await Test.findOne({
+                _id: testId,
+                testCenterOwner: ownerId
+            });
+
+            if (!test) {
+                throw new Error('Test not found or access denied');
+            }
+
+            // Prevent changes if test is active or has enrollments
+            if (['active', 'completed'].includes(test.status)) {
+                throw new Error('Cannot modify enrollment config for active or completed tests');
+            }
+
+            const hasEnrollments = await TestEnrollment.countDocuments({ test: testId });
+            if (hasEnrollments > 0) {
+                throw new Error('Cannot modify enrollment config when students are already enrolled');
+            }
+
+            // Update enrollment configuration
+            test.enrollmentConfig = {
+                ...test.enrollmentConfig,
+                ...enrollmentConfig
+            };
+
+            // Set requirePayment based on enrollmentFee
+            if (enrollmentConfig.enrollmentFee !== undefined) {
+                test.enrollmentConfig.requirePayment = enrollmentConfig.enrollmentFee > 0;
+            }
+
+            await test.save();
+
+            this.logger.info(`Enrollment config updated for test: ${testId}`);
+            return test;
+
+        } catch (error) {
+            this.logger.error('Failed to update enrollment config:', error);
+            throw error;
         }
     }
 }

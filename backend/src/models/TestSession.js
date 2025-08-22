@@ -158,6 +158,12 @@ const testSessionSchema = new Schema({
         index: true
     },
 
+    // Link to enrollment (if test requires enrollment)
+    enrollment: {
+        type: Schema.Types.ObjectId,
+        ref: 'TestEnrollment'
+    },
+
     // Access code used to join the test
     accessCodeUsed: {
         type: String,

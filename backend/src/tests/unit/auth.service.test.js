@@ -675,14 +675,19 @@ describe('AuthService', () => {
     describe('Security Tests', () => {
         const securityCases = createSecurityTestCases();
 
-        describe('SQL Injection Protection', () => {
-            it.each(securityCases.sqlInjection)('should handle SQL injection attempt: %s', async (maliciousInput) => {
+        describe('MongoDB Injection Protection', () => {
+            it.each(securityCases.mongodbInjection)('should handle MongoDB injection attempt: %s', async (maliciousInput) => {
                 // Arrange
                 User.findOne = vi.fn().mockResolvedValue(null);
 
-                // Act & Assert
+                // Act & Assert - Should handle malicious MongoDB queries gracefully
                 await expect(authService.login(maliciousInput, 'password'))
                     .rejects.toThrow('Invalid email or password');
+
+                // The system should either:
+                // 1. Reject the input during email validation (preferred)
+                // 2. Or safely handle it in the database query
+                // Both are valid security approaches for MongoDB
             });
         });
 

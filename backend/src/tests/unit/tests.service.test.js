@@ -74,18 +74,40 @@ describe('TestService - Complete Coverage', () => {
 
         mockTest = {
             _id: new ObjectId(),
-            title: 'Math Test',
-            description: 'Basic mathematics test',
+            title: 'Sample Test',
+            description: 'Test description',
+            timeLimit: 60,
             testCenterOwner: mockOwner._id,
             createdBy: mockCreator._id,
             subject: mockSubject._id,
-            status: 'draft',
-            totalQuestions: 10,
-            duration: 60,
-            questions: [],
-            stats: { totalAttempts: 0 },
+            startDate: new Date(Date.now() + 24 * 60 * 60 * 1000),
+            endDate: new Date(Date.now() + 48 * 60 * 60 * 1000),
+            questions: [mockQuestion._id],
+            isActive: true,
+            enrollmentConfig: {
+                isEnrollmentRequired: false,
+                enrollmentFee: 0,
+                maxEnrollments: null,
+                requirePayment: false,
+                allowLateEnrollment: true,
+                autoApprove: true
+            },
+            enrollmentStats: {
+                totalEnrollments: 0,
+                activeEnrollments: 0,
+                pendingPayments: 0,
+                totalRevenue: 0
+            },
             save: vi.fn().mockResolvedValue(true),
-            populate: vi.fn().mockReturnThis()
+            remove: vi.fn().mockResolvedValue(true),
+            populate: vi.fn().mockReturnThis(),
+            canBeStarted: vi.fn().mockReturnValue(true),
+            canBeEdited: vi.fn().mockReturnValue(true),
+            updateStatistics: vi.fn().mockResolvedValue(true),
+            addQuestions: vi.fn().mockResolvedValue(true),
+            removeQuestions: vi.fn().mockResolvedValue(true),
+            activate: vi.fn().mockResolvedValue(true),
+            deactivate: vi.fn().mockResolvedValue(true)
         };
 
         mockQuestion = {
@@ -839,6 +861,281 @@ describe('TestService - Complete Coverage', () => {
             // Act & Assert
             await expect(testService.createTest(testData, mockOwner._id, mockOwner._id))
                 .rejects.toThrow('Out of memory');
+        });
+    });
+
+    describe('getTestWithEnrollmentInfo - Enhanced Test Retrieval', () => {
+        it('should get test with enrollment information successfully', async () => {
+            // Arrange
+            const testWithEnrollment = {
+                ...mockTest,
+                enrollmentConfig: {
+                    isEnrollmentRequired: true,
+                    enrollmentFee: 100,
+                    maxEnrollments: 50
+                },
+                enrollmentStats: {
+                    totalEnrollments: 25,
+                    activeEnrollments: 20,
+                    pendingPayments: 5,
+                    totalRevenue: 2000
+                }
+            };
+
+            Test.findOne.mockReturnValue({
+                populate: vi.fn().mockResolvedValue(testWithEnrollment)
+            });
+
+            // Act
+            const result = await testService.getTestWithEnrollmentInfo(mockTest._id, mockOwner._id);
+
+            // Assert
+            expect(Test.findOne).toHaveBeenCalledWith({
+                _id: mockTest._id,
+                testCenterOwner: mockOwner._id
+            });
+            expect(result).toEqual(testWithEnrollment);
+            expect(result.enrollmentConfig).toBeDefined();
+            expect(result.enrollmentStats).toBeDefined();
+        });
+
+        it('should throw error when test not found for enrollment info', async () => {
+            // Arrange
+            Test.findOne.mockReturnValue({
+                populate: vi.fn().mockResolvedValue(null)
+            });
+
+            // Act & Assert
+            await expect(testService.getTestWithEnrollmentInfo(mockTest._id, mockOwner._id))
+                .rejects.toThrow('Test not found or access denied');
+        });
+
+        it('should handle database errors during enrollment info retrieval', async () => {
+            // Arrange
+            Test.findOne.mockReturnValue({
+                populate: vi.fn().mockRejectedValue(new Error('Database connection failed'))
+            });
+
+            // Act & Assert
+            await expect(testService.getTestWithEnrollmentInfo(mockTest._id, mockOwner._id))
+                .rejects.toThrow('Database connection failed');
+        });
+    });
+
+    describe('updateEnrollmentConfig - Enrollment Configuration', () => {
+        it('should update enrollment configuration successfully', async () => {
+            // Arrange
+            const enrollmentConfig = {
+                isEnrollmentRequired: true,
+                enrollmentFee: 150,
+                maxEnrollments: 100,
+                requirePayment: true,
+                allowLateEnrollment: false,
+                autoApprove: true,
+                enrollmentDeadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+            };
+
+            const updatedTest = {
+                ...mockTest,
+                enrollmentConfig
+            };
+
+            Test.findOne.mockResolvedValue(mockTest);
+            mockTest.save.mockResolvedValue(updatedTest);
+
+            // Act
+            const result = await testService.updateEnrollmentConfig(
+                mockTest._id,
+                mockOwner._id,
+                enrollmentConfig
+            );
+
+            // Assert
+            expect(Test.findOne).toHaveBeenCalledWith({
+                _id: mockTest._id,
+                testCenterOwner: mockOwner._id
+            });
+            expect(mockTest.enrollmentConfig).toEqual(enrollmentConfig);
+            expect(mockTest.save).toHaveBeenCalled();
+            expect(result).toEqual(updatedTest);
+        });
+
+        it('should validate enrollment fee is non-negative', async () => {
+            // Arrange
+            const invalidConfig = {
+                enrollmentFee: -50
+            };
+
+            Test.findOne.mockResolvedValue(mockTest);
+
+            // Act & Assert
+            await expect(testService.updateEnrollmentConfig(
+                mockTest._id,
+                mockOwner._id,
+                invalidConfig
+            )).rejects.toThrow('Enrollment fee must be non-negative');
+        });
+
+        it('should validate max enrollments is positive', async () => {
+            // Arrange
+            const invalidConfig = {
+                maxEnrollments: 0
+            };
+
+            Test.findOne.mockResolvedValue(mockTest);
+
+            // Act & Assert
+            await expect(testService.updateEnrollmentConfig(
+                mockTest._id,
+                mockOwner._id,
+                invalidConfig
+            )).rejects.toThrow('Maximum enrollments must be positive');
+        });
+
+        it('should validate enrollment deadline is in future', async () => {
+            // Arrange
+            const invalidConfig = {
+                enrollmentDeadline: new Date(Date.now() - 24 * 60 * 60 * 1000)
+            };
+
+            Test.findOne.mockResolvedValue(mockTest);
+
+            // Act & Assert
+            await expect(testService.updateEnrollmentConfig(
+                mockTest._id,
+                mockOwner._id,
+                invalidConfig
+            )).rejects.toThrow('Enrollment deadline must be in the future');
+        });
+
+        it('should handle partial enrollment config updates', async () => {
+            // Arrange
+            const partialConfig = {
+                enrollmentFee: 200
+            };
+
+            const existingConfig = {
+                isEnrollmentRequired: true,
+                enrollmentFee: 100,
+                maxEnrollments: 50
+            };
+
+            const testWithConfig = {
+                ...mockTest,
+                enrollmentConfig: existingConfig
+            };
+
+            Test.findOne.mockResolvedValue(testWithConfig);
+            testWithConfig.save = vi.fn().mockResolvedValue(testWithConfig);
+
+            // Act
+            const result = await testService.updateEnrollmentConfig(
+                mockTest._id,
+                mockOwner._id,
+                partialConfig
+            );
+
+            // Assert
+            expect(testWithConfig.enrollmentConfig.enrollmentFee).toBe(200);
+            expect(testWithConfig.enrollmentConfig.isEnrollmentRequired).toBe(true);
+            expect(testWithConfig.enrollmentConfig.maxEnrollments).toBe(50);
+        });
+
+        it('should throw error when test not found for config update', async () => {
+            // Arrange
+            Test.findOne.mockResolvedValue(null);
+
+            // Act & Assert
+            await expect(testService.updateEnrollmentConfig(
+                mockTest._id,
+                mockOwner._id,
+                {}
+            )).rejects.toThrow('Test not found or access denied');
+        });
+
+        it('should handle database errors during config update', async () => {
+            // Arrange
+            Test.findOne.mockResolvedValue(mockTest);
+            mockTest.save.mockRejectedValue(new Error('Save operation failed'));
+
+            // Act & Assert
+            await expect(testService.updateEnrollmentConfig(
+                mockTest._id,
+                mockOwner._id,
+                { enrollmentFee: 100 }
+            )).rejects.toThrow('Save operation failed');
+        });
+    });
+
+    describe('Enrollment Integration Tests', () => {
+        it('should handle tests with enrollment requirements during creation', async () => {
+            // Arrange
+            const testData = {
+                title: 'Enrollment Test',
+                description: 'Test with enrollment',
+                subject: mockSubject._id,
+                enrollmentConfig: {
+                    isEnrollmentRequired: true,
+                    enrollmentFee: 50,
+                    maxEnrollments: 30
+                }
+            };
+
+            Subject.findOne.mockResolvedValue(mockSubject);
+            User.findById.mockResolvedValue(mockOwner);
+            Question.countDocuments.mockResolvedValue(5);
+            Test.mockImplementation(() => ({
+                ...mockTest,
+                ...testData,
+                save: vi.fn().mockResolvedValue({
+                    ...mockTest,
+                    ...testData
+                })
+            }));
+
+            subscriptionService.validateAction.mockResolvedValue(true);
+
+            // Act
+            const result = await testService.createTest(testData, mockOwner._id);
+
+            // Assert
+            expect(result.enrollmentConfig.isEnrollmentRequired).toBe(true);
+            expect(result.enrollmentConfig.enrollmentFee).toBe(50);
+            expect(result.enrollmentConfig.maxEnrollments).toBe(30);
+        });
+
+        it('should update enrollment statistics correctly', async () => {
+            // Arrange
+            const statsUpdate = {
+                totalEnrollments: 25,
+                activeEnrollments: 20,
+                pendingPayments: 5,
+                totalRevenue: 1000
+            };
+
+            Test.findOne.mockResolvedValue({
+                ...mockTest,
+                enrollmentStats: {}
+            });
+
+            // Mock the save method to update stats
+            const testWithStats = {
+                ...mockTest,
+                enrollmentStats: statsUpdate,
+                save: vi.fn().mockResolvedValue(true)
+            };
+
+            Test.findOne.mockResolvedValue(testWithStats);
+
+            // Act
+            const result = await testService.updateEnrollmentConfig(
+                mockTest._id,
+                mockOwner._id,
+                { enrollmentFee: 100 }
+            );
+
+            // Assert - Should preserve existing stats during config update
+            expect(testWithStats.save).toHaveBeenCalled();
         });
     });
 });

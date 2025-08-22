@@ -1,4 +1,4 @@
-import { TestSession, Test, Question } from '../../models/index.js';
+import { TestSession, Test, Question, TestEnrollment } from '../../models/index.js';
 import { logger } from '../../config/logger.js';
 
 class TestSessionService {
@@ -21,13 +21,42 @@ class TestSessionService {
                 throw new Error('Test not found');
             }
 
-            // Validate access code if test requires one
-            if (test.accessCode) {
+            // Check enrollment requirement
+            let enrollment = null;
+            if (test.enrollmentConfig.isEnrollmentRequired) {
                 if (!accessCode) {
-                    throw new Error('Access code is required for this test');
+                    throw new Error('Access code is required for enrollment-based tests');
                 }
-                if (test.accessCode !== accessCode) {
-                    throw new Error('Invalid access code');
+
+                enrollment = await TestEnrollment.findOne({
+                    test: testId,
+                    student: studentId,
+                    accessCode: accessCode.toUpperCase(),
+                    enrollmentStatus: 'enrolled',
+                    paymentStatus: 'completed'
+                });
+
+                if (!enrollment) {
+                    throw new Error('Valid enrollment required to take this test');
+                }
+
+                if (enrollment.accessCodeUsed) {
+                    throw new Error('Access code has already been used');
+                }
+
+                // Check enrollment expiry
+                if (enrollment.expiresAt && enrollment.expiresAt < new Date()) {
+                    throw new Error('Enrollment has expired');
+                }
+            } else {
+                // Validate access code if test requires one (non-enrollment based)
+                if (test.accessCode) {
+                    if (!accessCode) {
+                        throw new Error('Access code is required for this test');
+                    }
+                    if (test.accessCode !== accessCode) {
+                        throw new Error('Invalid access code');
+                    }
                 }
             }
 
@@ -74,6 +103,7 @@ class TestSessionService {
                 questions: questions.map(q => q._id),
                 totalQuestions: questions.length,
                 testCenterOwner: test.testCenterOwner,
+                enrollment: enrollment?._id, // Link to enrollment if exists
                 startTime: new Date(),
                 endTime: new Date(Date.now() + (test.duration * 60 * 1000)),
                 accessCodeUsed: accessCode,
@@ -85,6 +115,13 @@ class TestSessionService {
             });
 
             await session.save();
+
+            // Mark enrollment access code as used if enrollment-based test
+            if (enrollment) {
+                enrollment.accessCodeUsed = true;
+                enrollment.accessCodeUsedAt = new Date();
+                await enrollment.save();
+            }
 
             logger.info(`Test session created successfully: ${session._id}`);
             return {

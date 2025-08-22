@@ -172,6 +172,41 @@ const testSchema = new Schema({
         ref: 'Question'
     }],
 
+    // Enrollment Configuration
+    enrollmentConfig: {
+        isEnrollmentRequired: {
+            type: Boolean,
+            default: false
+        },
+        enrollmentFee: {
+            type: Number,
+            default: 0,
+            min: [0, 'Enrollment fee cannot be negative']
+        },
+        maxEnrollments: {
+            type: Number,
+            default: -1, // -1 = unlimited
+            min: [-1, 'Max enrollments cannot be less than -1']
+        },
+        enrollmentDeadline: {
+            type: Date
+        },
+        allowLateEnrollment: {
+            type: Boolean,
+            default: false
+        },
+        requirePayment: {
+            type: Boolean,
+            default: function () {
+                return this.enrollmentFee > 0;
+            }
+        },
+        autoApprove: {
+            type: Boolean,
+            default: true
+        }
+    },
+
     // Test Statistics
     stats: {
         totalAttempts: {
@@ -193,6 +228,26 @@ const testSchema = new Schema({
         lowestScore: {
             type: Number,
             default: 100
+        }
+    },
+
+    // Enrollment Statistics
+    enrollmentStats: {
+        totalEnrolled: {
+            type: Number,
+            default: 0
+        },
+        paidEnrollments: {
+            type: Number,
+            default: 0
+        },
+        pendingPayments: {
+            type: Number,
+            default: 0
+        },
+        totalRevenue: {
+            type: Number,
+            default: 0
         }
     },
 
