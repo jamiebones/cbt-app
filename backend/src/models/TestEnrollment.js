@@ -36,14 +36,7 @@ const testEnrollmentSchema = new Schema({
         min: [0, 'Payment amount cannot be negative']
     },
 
-    paymentMethod: {
-        type: String,
-        enum: {
-            values: ['card', 'bank_transfer', 'cash', 'wallet', 'free'],
-            message: 'Invalid payment method'
-        }
-    },
-
+ 
     transactionId: {
         type: String,
         trim: true,
@@ -63,7 +56,7 @@ const testEnrollmentSchema = new Schema({
         trim: true,
         uppercase: true,
         minlength: [6, 'Access code must be at least 6 characters'],
-        maxlength: [16, 'Access code cannot exceed 16 characters'],
+        maxlength: [10, 'Access code cannot exceed 10 characters'],
         index: true
     },
 
@@ -93,9 +86,6 @@ const testEnrollmentSchema = new Schema({
         type: Date
     },
 
-    expiresAt: {
-        type: Date
-    },
 
     cancelledAt: {
         type: Date
@@ -105,13 +95,6 @@ const testEnrollmentSchema = new Schema({
         type: String,
         trim: true,
         maxlength: [500, 'Cancellation reason cannot exceed 500 characters']
-    },
-
-    // Metadata
-    enrollmentNotes: {
-        type: String,
-        trim: true,
-        maxlength: [1000, 'Enrollment notes cannot exceed 1000 characters']
     },
 
     // Relationships

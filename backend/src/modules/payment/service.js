@@ -17,7 +17,7 @@ class PaymentService {
     }
 
     // Initialize payment for enrollment
-    async initializePayment(amount, currency = 'USD', metadata = {}) {
+    async initializePayment(amount, currency = 'NGN', metadata = {}) {
         try {
             // Validate payment amount
             if (amount < 0) {

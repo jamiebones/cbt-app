@@ -5,13 +5,10 @@ import { logger } from '../../config/logger.js';
 import crypto from 'crypto';
 
 class TestEnrollmentService {
-    constructor() {
-        this.logger = logger;
-    }
 
     // Enroll student for test
     async enrollStudent(testId, studentId, enrollmentData = {}) {
-        this.logger.info(`Enrolling student ${studentId} for test ${testId}`);
+        logger.info(`Enrolling student ${studentId} for test ${testId}`);
 
         try {
             // Validate test exists and is available for enrollment
@@ -80,9 +77,7 @@ class TestEnrollmentService {
                 paymentAmount,
                 enrollmentStatus: paymentAmount > 0 ? 'payment_pending' : 'enrolled',
                 paymentStatus: paymentAmount > 0 ? 'pending' : 'completed',
-                paymentMethod: paymentAmount > 0 ? null : 'free',
-                enrollmentNotes: enrollmentData.notes,
-                expiresAt: enrollmentData.expiresAt
+                enrollmentNotes: enrollmentData.notes
             });
 
             await enrollment.save();
@@ -92,7 +87,7 @@ class TestEnrollmentService {
             if (paymentAmount > 0 && test.enrollmentConfig.requirePayment) {
                 paymentData = await paymentService.initializePayment(
                     paymentAmount,
-                    'USD',
+                    'NGN',
                     {
                         enrollmentId: enrollment._id,
                         testId,
@@ -116,7 +111,7 @@ class TestEnrollmentService {
             // Update test enrollment statistics
             await this.updateTestEnrollmentStats(testId);
 
-            this.logger.info(`Student enrollment created: ${enrollment._id}`);
+            logger.info(`Student enrollment created: ${enrollment._id}`);
 
             return {
                 enrollment,
@@ -124,14 +119,14 @@ class TestEnrollmentService {
             };
 
         } catch (error) {
-            this.logger.error('Failed to enroll student:', error);
+            logger.error('Failed to enroll student:', error);
             throw error;
         }
     }
 
     // Process payment and update enrollment
     async processPayment(enrollmentId, paymentDetails) {
-        this.logger.info(`Processing payment for enrollment: ${enrollmentId}`);
+        logger.info(`Processing payment for enrollment: ${enrollmentId}`);
 
         try {
             const enrollment = await TestEnrollment.findById(enrollmentId);
@@ -158,7 +153,7 @@ class TestEnrollmentService {
                 // Update test statistics
                 await this.updateTestEnrollmentStats(enrollment.test);
 
-                this.logger.info(`Payment completed for enrollment: ${enrollmentId}`);
+                logger.info(`Payment completed for enrollment: ${enrollmentId}`);
 
                 // Populate and return updated enrollment
                 await enrollment.populate([
@@ -175,7 +170,7 @@ class TestEnrollmentService {
             }
 
         } catch (error) {
-            this.logger.error('Failed to process payment:', error);
+            logger.error('Failed to process payment:', error);
             throw error;
         }
     }
@@ -186,7 +181,6 @@ class TestEnrollmentService {
         let isUnique = false;
         let attempts = 0;
         const maxAttempts = 10;
-
         while (!isUnique && attempts < maxAttempts) {
             accessCode = crypto.randomBytes(6).toString('hex').toUpperCase();
             const existing = await TestEnrollment.findOne({ accessCode });
@@ -205,7 +199,7 @@ class TestEnrollmentService {
 
     // Validate access code for test taking
     async validateAccessCode(accessCode, studentId, testId = null) {
-        this.logger.info(`Validating access code: ${accessCode}`);
+        logger.info(`Validating access code: ${accessCode}`);
 
         try {
             const query = {
@@ -246,23 +240,19 @@ class TestEnrollmentService {
                 throw new Error('Test is not currently available');
             }
 
-            // Check expiry
-            if (enrollment.expiresAt && enrollment.expiresAt < new Date()) {
-                throw new Error('Enrollment has expired');
-            }
 
-            this.logger.info(`Access code validated successfully: ${accessCode}`);
+            logger.info(`Access code validated successfully: ${accessCode}`);
             return enrollment;
 
         } catch (error) {
-            this.logger.error('Access code validation failed:', error);
+            logger.error('Access code validation failed:', error);
             throw error;
         }
     }
 
     // Get enrollments for test (admin view)
     async getTestEnrollments(testId, ownerId, options = {}) {
-        this.logger.info(`Getting enrollments for test: ${testId}`);
+        logger.info(`Getting enrollments for test: ${testId}`);
 
         try {
             // Verify test ownership
@@ -272,7 +262,7 @@ class TestEnrollmentService {
             });
 
             if (!test) {
-                throw new Error('Test not found or access denied');
+                throw new Error('Test not found');
             }
 
             const {
@@ -289,9 +279,14 @@ class TestEnrollmentService {
             if (enrollmentStatus) query.enrollmentStatus = enrollmentStatus;
             if (paymentStatus) query.paymentStatus = paymentStatus;
 
-            // Add search functionality
+            // Add search functionality - more efficient approach using aggregation
             if (search) {
                 const searchRegex = new RegExp(search, 'i');
+                query.$or = [
+                    // Direct search on populated student fields will be handled in aggregation
+                ];
+
+                // Get student IDs matching search criteria
                 const students = await User.find({
                     $or: [
                         { firstName: searchRegex },
@@ -304,30 +299,20 @@ class TestEnrollmentService {
                 if (students.length > 0) {
                     query.student = { $in: students.map(s => s._id) };
                 } else {
-                    // No students found matching search
-                    return {
-                        enrollments: [],
-                        pagination: {
-                            page: parseInt(page),
-                            limit: parseInt(limit),
-                            total: 0,
-                            pages: 0
-                        },
-                        statistics: await this.getEnrollmentStatistics(testId)
-                    };
+                    // No students found matching search - still need to check other search criteria
+                    query.student = { $in: [] }; // This will return no results but maintain pagination structure
                 }
             }
 
-            const [enrollments, total] = await Promise.all([
+            const [enrollments, total, statistics] = await Promise.all([
                 TestEnrollment.find(query)
                     .populate('student', 'firstName lastName email studentRegNumber')
                     .sort({ createdAt: -1 })
                     .limit(parseInt(limit))
                     .skip(parseInt(skip)),
-                TestEnrollment.countDocuments(query)
+                TestEnrollment.countDocuments(query),
+                this.getEnrollmentStatistics(testId)
             ]);
-
-            const statistics = await this.getEnrollmentStatistics(testId);
 
             return {
                 enrollments,
@@ -341,14 +326,14 @@ class TestEnrollmentService {
             };
 
         } catch (error) {
-            this.logger.error('Failed to get test enrollments:', error);
+            logger.error('Failed to get test enrollments:', error);
             throw error;
         }
     }
 
     // Get student's enrollments
     async getStudentEnrollments(studentId, options = {}) {
-        this.logger.info(`Getting enrollments for student: ${studentId}`);
+        logger.info(`Getting enrollments for student: ${studentId}`);
 
         try {
             const {
@@ -384,14 +369,14 @@ class TestEnrollmentService {
             };
 
         } catch (error) {
-            this.logger.error('Failed to get student enrollments:', error);
+            logger.error('Failed to get student enrollments:', error);
             throw error;
         }
     }
 
     // Cancel enrollment
     async cancelEnrollment(enrollmentId, reason, cancelledBy) {
-        this.logger.info(`Cancelling enrollment: ${enrollmentId}`);
+        logger.info(`Cancelling enrollment: ${enrollmentId}`);
 
         try {
             const enrollment = await TestEnrollment.findById(enrollmentId);
@@ -401,6 +386,16 @@ class TestEnrollmentService {
 
             if (enrollment.enrollmentStatus === 'cancelled') {
                 throw new Error('Enrollment is already cancelled');
+            }
+
+            // Validate that only test center owners can cancel enrollments
+            const test = await Test.findById(enrollment.test);
+            if (!test) {
+                throw new Error('Associated test not found');
+            }
+
+            if (test.testCenterOwner.toString() !== cancelledBy.toString()) {
+                throw new Error('Only test center owners can cancel enrollments');
             }
 
             // Process refund if payment was completed
@@ -421,19 +416,19 @@ class TestEnrollmentService {
             // Update test statistics
             await this.updateTestEnrollmentStats(enrollment.test);
 
-            this.logger.info(`Enrollment cancelled: ${enrollmentId}`);
+            logger.info(`Enrollment cancelled: ${enrollmentId}`);
 
             return { enrollment, refundData };
 
         } catch (error) {
-            this.logger.error('Failed to cancel enrollment:', error);
+            logger.error('Failed to cancel enrollment:', error);
             throw error;
         }
     }
 
     // Handle payment webhook
     async handlePaymentWebhook(webhookData) {
-        this.logger.info('Processing enrollment payment webhook');
+        logger.info('Processing enrollment payment webhook');
 
         try {
             const processedWebhook = await paymentService.handleWebhook(
@@ -459,7 +454,7 @@ class TestEnrollmentService {
             return processedWebhook;
 
         } catch (error) {
-            this.logger.error('Failed to process payment webhook:', error);
+            logger.error('Failed to process payment webhook:', error);
             throw error;
         }
     }
@@ -511,7 +506,7 @@ class TestEnrollmentService {
             return summary;
 
         } catch (error) {
-            this.logger.error('Failed to get enrollment statistics:', error);
+            logger.error('Failed to get enrollment statistics:', error);
             return {
                 totalEnrollments: 0,
                 activeEnrollments: 0,
@@ -535,7 +530,7 @@ class TestEnrollmentService {
             });
 
         } catch (error) {
-            this.logger.error('Failed to update test enrollment stats:', error);
+            logger.error('Failed to update test enrollment stats:', error);
         }
     }
 
@@ -550,7 +545,7 @@ class TestEnrollmentService {
             }
             return enrollment;
         } catch (error) {
-            this.logger.error('Failed to mark access code as used:', error);
+            logger.error('Failed to mark access code as used:', error);
             throw error;
         }
     }

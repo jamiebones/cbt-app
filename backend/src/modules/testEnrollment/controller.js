@@ -55,10 +55,8 @@ class TestEnrollmentController {
             const userId = req.user.id;
 
             // Verify enrollment belongs to user or user has admin access
-            const enrollment = await this.service.validateEnrollmentAccess(enrollmentId, userId, req.user.role);
-
+            await this.service.validateEnrollmentAccess(enrollmentId, userId, req.user.role);
             const result = await this.service.processPayment(enrollmentId, paymentDetails);
-
             res.json({
                 success: true,
                 message: 'Payment processed successfully',

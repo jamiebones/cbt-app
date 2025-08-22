@@ -183,11 +183,11 @@ const testSchema = new Schema({
             default: 0,
             min: [0, 'Enrollment fee cannot be negative']
         },
-        maxEnrollments: {
-            type: Number,
-            default: -1, // -1 = unlimited
-            min: [-1, 'Max enrollments cannot be less than -1']
-        },
+        // maxEnrollments: {
+        //     type: Number,
+        //     default: -1, // -1 = unlimited
+        //     min: [-1, 'Max enrollments cannot be less than -1']
+        // },
         enrollmentDeadline: {
             type: Date
         },

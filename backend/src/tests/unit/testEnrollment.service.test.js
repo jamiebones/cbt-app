@@ -148,7 +148,7 @@ describe('TestEnrollmentService - Complete Coverage', () => {
             });
             expect(paymentService.initializePayment).toHaveBeenCalledWith(
                 100,
-                'USD',
+                'NGN',
                 {
                     enrollmentId: mockEnrollment._id,
                     testId: mockTest._id,
@@ -477,30 +477,6 @@ describe('TestEnrollmentService - Complete Coverage', () => {
             )).rejects.toThrow('Test is not currently available');
         });
 
-        it('should throw error when enrollment expired', async () => {
-            // Arrange
-            const expiredEnrollment = {
-                ...mockEnrollment,
-                enrollmentStatus: 'enrolled',
-                paymentStatus: 'completed',
-                accessCodeUsed: false,
-                expiresAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
-                test: {
-                    ...mockTest,
-                    canBeStarted: vi.fn().mockReturnValue(true)
-                }
-            };
-
-            TestEnrollment.findOne.mockReturnValue({
-                populate: vi.fn().mockResolvedValue(expiredEnrollment)
-            });
-
-            // Act & Assert
-            await expect(testEnrollmentService.validateAccessCode(
-                'ABC123DEF',
-                mockStudent._id
-            )).rejects.toThrow('Enrollment has expired');
-        });
     });
 
     describe('getTestEnrollments - Enrollment Listing', () => {
@@ -552,7 +528,7 @@ describe('TestEnrollmentService - Complete Coverage', () => {
             await expect(testEnrollmentService.getTestEnrollments(
                 mockTest._id,
                 mockOwner._id
-            )).rejects.toThrow('Test not found or access denied');
+            )).rejects.toThrow('Test not found');
         });
 
         it('should handle search functionality', async () => {
@@ -615,6 +591,7 @@ describe('TestEnrollmentService - Complete Coverage', () => {
             };
 
             TestEnrollment.findById.mockResolvedValue(paidEnrollment);
+            Test.findById.mockResolvedValue(mockTest); // Mock test for ownership validation
             paymentService.processRefund.mockResolvedValue({
                 refundId: 'REF_123456',
                 status: 'completed'
@@ -624,7 +601,7 @@ describe('TestEnrollmentService - Complete Coverage', () => {
             const result = await testEnrollmentService.cancelEnrollment(
                 mockEnrollment._id,
                 'Student request',
-                mockStudent._id
+                mockOwner._id // Use test center owner ID
             );
 
             // Assert
@@ -648,6 +625,7 @@ describe('TestEnrollmentService - Complete Coverage', () => {
             };
 
             TestEnrollment.findById.mockResolvedValue(freeEnrollment);
+            Test.findById.mockResolvedValue(mockTest); // Mock test for ownership validation
 
             // Act
             const result = await testEnrollmentService.cancelEnrollment(
@@ -688,6 +666,24 @@ describe('TestEnrollmentService - Complete Coverage', () => {
                 'Reason',
                 mockStudent._id
             )).rejects.toThrow('Enrollment is already cancelled');
+        });
+
+        it('should throw error when non-owner tries to cancel enrollment', async () => {
+            // Arrange
+            const activeEnrollment = {
+                ...mockEnrollment,
+                enrollmentStatus: 'enrolled'
+            };
+
+            TestEnrollment.findById.mockResolvedValue(activeEnrollment);
+            Test.findById.mockResolvedValue(mockTest);
+
+            // Act & Assert
+            await expect(testEnrollmentService.cancelEnrollment(
+                mockEnrollment._id,
+                'Unauthorized cancellation',
+                mockStudent._id // Student trying to cancel (not the owner)
+            )).rejects.toThrow('Only test center owners can cancel enrollments');
         });
 
         it('should handle database errors during cancellation', async () => {
