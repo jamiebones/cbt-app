@@ -25,8 +25,17 @@ router.post('/auto-select', questionController.autoSelectQuestions);
 // POST /api/questions/auto-select/preview - Preview auto-selection
 router.post('/auto-select/preview', questionController.previewAutoSelection);
 
-// POST /api/questions/bulk-import - Bulk import questions
-router.post('/bulk-import', questionController.bulkImportQuestions);
+// POST /api/questions/bulk-import - Bulk import questions from Excel
+router.post('/bulk-import', questionController.upload.single('excelFile'), questionController.bulkImportQuestions);
+
+// POST /api/questions/bulk-import/preview - Preview Excel import
+router.post('/bulk-import/preview', questionController.upload.single('excelFile'), questionController.previewExcelImport);
+
+// GET /api/questions/bulk-import/template - Download Excel template
+router.get('/bulk-import/template', questionController.downloadExcelTemplate);
+
+// GET /api/questions/bulk-import/status/:batchId - Get import batch status  
+router.get('/bulk-import/status/:batchId', questionController.getImportBatchStatus);
 
 // GET /api/questions/:id - Get a specific question by ID
 router.get('/:id', questionController.getQuestionById);

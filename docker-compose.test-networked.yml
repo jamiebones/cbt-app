@@ -1,0 +1,18 @@
+services:
+  backend-test-networked:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: development
+    working_dir: /app
+    environment:
+      - NODE_ENV=test
+      - TEST_MODE=true
+    networks:
+      - cbt-network
+    command: node src/tests/manual/testExcelImport.js
+
+networks:
+  cbt-network:
+    name: cbt-app_cbt-network
+    external: true

@@ -1,5 +1,7 @@
 import { Question, Subject, User } from '../../models/index.js';
 import { logger } from '../../config/logger.js';
+import { excelQuestionService } from './excelService.js';
+import { subscriptionService } from '../subscriptions/service.js';
 
 class QuestionBankService {
 
@@ -598,6 +600,225 @@ class QuestionBankService {
 
         } catch (error) {
             logger.error('Failed to get question statistics:', error);
+            throw error;
+        }
+    }
+
+    // ============ EXCEL IMPORT FUNCTIONALITY ============
+
+    /**
+     * Import questions from Excel file
+     * @param {Buffer} fileBuffer - Excel file buffer
+     * @param {string} subjectCode - Subject code for all questions
+     * @param {string} ownerId - Test center owner ID
+     * @param {string} createdBy - User ID who is importing
+     * @param {Object} options - Import options
+     * @returns {Promise<Object>} Import results
+     */
+    async importQuestionsFromExcel(fileBuffer, subjectCode, ownerId, createdBy, options = {}) {
+        logger.info(`Starting Excel import for subject: ${subjectCode}, owner: ${ownerId}`);
+
+        try {
+            // Check subscription limits for Excel import
+            const validation = await subscriptionService.validateAction(ownerId, 'importExcel');
+            if (!validation.allowed) {
+                throw new Error(validation.message);
+            }
+
+            // Parse Excel file
+            const parseResult = await excelQuestionService.parseExcelFile(fileBuffer);
+            logger.info(`Parsed ${parseResult.totalRows} rows from Excel file`);
+
+            // Validate parsed data
+            const validationResult = await excelQuestionService.validateExcelData(
+                parseResult.questions,
+                subjectCode,
+                ownerId
+            );
+
+            if (!validationResult.isValid && validationResult.validQuestions.length === 0) {
+                return {
+                    success: false,
+                    message: 'No valid questions found in Excel file',
+                    errors: validationResult.errors,
+                    totalRows: parseResult.totalRows,
+                    validCount: 0,
+                    invalidCount: parseResult.totalRows
+                };
+            }
+
+            // Check subscription limits for question count
+            const questionCountValidation = await subscriptionService.validateAction(
+                ownerId,
+                'createQuestion',
+                { count: validationResult.validQuestions.length }
+            );
+
+            if (!questionCountValidation.allowed) {
+                throw new Error(questionCountValidation.message);
+            }
+
+            // Perform bulk import for valid questions
+            const importResult = await excelQuestionService.bulkImportQuestions(
+                validationResult.validQuestions,
+                ownerId,
+                createdBy
+            );
+
+            return {
+                success: true,
+                message: `Successfully imported ${importResult.successCount} out of ${parseResult.totalRows} questions`,
+                batchId: importResult.batchId,
+                summary: {
+                    totalRows: parseResult.totalRows,
+                    validCount: validationResult.validQuestions.length,
+                    invalidCount: validationResult.invalidQuestions.length,
+                    successCount: importResult.successCount,
+                    errorCount: importResult.errorCount
+                },
+                results: importResult.results,
+                validationErrors: validationResult.errors,
+                validationWarnings: validationResult.warnings,
+                importedQuestions: importResult.importedQuestions.map(q => ({
+                    id: q._id,
+                    questionText: q.questionText.substring(0, 100) + '...',
+                    type: q.type,
+                    difficulty: q.difficulty,
+                    points: q.points
+                }))
+            };
+
+        } catch (error) {
+            logger.error('Excel import failed:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Preview Excel import without actually importing
+     * @param {Buffer} fileBuffer - Excel file buffer  
+     * @param {string} subjectCode - Subject code for all questions
+     * @param {string} ownerId - Test center owner ID
+     * @param {Object} options - Preview options
+     * @returns {Promise<Object>} Preview results
+     */
+    async previewExcelImport(fileBuffer, subjectCode, ownerId, options = {}) {
+        logger.info(`Previewing Excel import for subject: ${subjectCode}, owner: ${ownerId}`);
+
+        try {
+            const { maxRows = 100 } = options;
+
+            // Parse Excel file
+            const parseResult = await excelQuestionService.parseExcelFile(fileBuffer);
+
+            // Limit preview to maxRows
+            const questionsToPreview = parseResult.questions.slice(0, maxRows);
+
+            // Validate parsed data
+            const validationResult = await excelQuestionService.validateExcelData(
+                questionsToPreview,
+                subjectCode,
+                ownerId
+            );
+
+            // Check subscription limits
+            const subscriptionValidation = await subscriptionService.validateAction(
+                ownerId,
+                'createQuestion',
+                { count: validationResult.validQuestions.length }
+            );
+
+            return {
+                success: true,
+                preview: {
+                    totalRowsInFile: parseResult.totalRows,
+                    previewRows: questionsToPreview.length,
+                    validCount: validationResult.validQuestions.length,
+                    invalidCount: validationResult.invalidQuestions.length,
+                    subscriptionAllowed: subscriptionValidation.allowed,
+                    subscriptionMessage: subscriptionValidation.message
+                },
+                sampleQuestions: validationResult.validQuestions.slice(0, 5).map(q => ({
+                    row: q.rowNumber,
+                    questionText: q.questionText.substring(0, 100) + '...',
+                    type: q.type,
+                    difficulty: q.difficulty,
+                    points: q.points,
+                    hasAnswers: q.answers && q.answers.length > 0
+                })),
+                errors: validationResult.errors.slice(0, 20), // Limit errors shown
+                warnings: validationResult.warnings.slice(0, 10), // Limit warnings shown
+                metadata: parseResult.metadata
+            };
+
+        } catch (error) {
+            logger.error('Excel preview failed:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Generate Excel template for question import
+     * @param {string} ownerId - Test center owner ID (for future customization)
+     * @returns {Buffer} Excel template file buffer
+     */
+    async generateExcelTemplate(ownerId) {
+        logger.info(`Generating Excel template for owner: ${ownerId}`);
+
+        try {
+            // Check if user can import Excel files
+            const validation = await subscriptionService.validateAction(ownerId, 'importExcel');
+            if (!validation.allowed) {
+                throw new Error(validation.message);
+            }
+
+            const templateBuffer = excelQuestionService.generateTemplate();
+
+            logger.info('Excel template generated successfully');
+            return templateBuffer;
+
+        } catch (error) {
+            logger.error('Failed to generate Excel template:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Get import batch status (for tracking long-running imports)
+     * @param {string} batchId - Batch ID from import
+     * @param {string} ownerId - Test center owner ID
+     * @returns {Promise<Object>} Batch status
+     */
+    async getImportBatchStatus(batchId, ownerId) {
+        logger.info(`Getting import batch status: ${batchId} for owner: ${ownerId}`);
+
+        try {
+            // For now, we'll query recently imported questions
+            // In a more advanced implementation, this could be stored in Redis
+            const recentQuestions = await Question.find({
+                testCenterOwner: ownerId,
+                createdAt: { $gte: new Date(Date.now() - 24 * 60 * 60 * 1000) } // Last 24 hours
+            })
+                .populate('subject', 'name code')
+                .sort({ createdAt: -1 })
+                .limit(100);
+
+            // Simple status response
+            return {
+                batchId,
+                status: 'completed', // In future: 'pending', 'processing', 'completed', 'failed'
+                questionsCount: recentQuestions.length,
+                recentQuestions: recentQuestions.slice(0, 10).map(q => ({
+                    id: q._id,
+                    questionText: q.questionText.substring(0, 100) + '...',
+                    type: q.type,
+                    subject: q.subject,
+                    createdAt: q.createdAt
+                }))
+            };
+
+        } catch (error) {
+            logger.error('Failed to get import batch status:', error);
             throw error;
         }
     }

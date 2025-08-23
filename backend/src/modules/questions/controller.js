@@ -1,9 +1,40 @@
 import { questionBankService } from './service.js';
 import { logger } from '../../config/logger.js';
+import {
+    excelImportSchema,
+    previewImportSchema,
+    fileValidationSchema
+} from './validators/excelValidators.js';
+import multer from 'multer';
 
 class QuestionController {
     constructor() {
         this.questionBankService = questionBankService;
+
+        // Configure multer for Excel file uploads
+        this.upload = multer({
+            storage: multer.memoryStorage(),
+            limits: {
+                fileSize: 10 * 1024 * 1024, // 10MB max file size
+                files: 1 // Only one file at a time
+            },
+            fileFilter: (req, file, cb) => {
+                // Validate file type
+                const allowedMimes = [
+                    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
+                    'application/vnd.ms-excel', // .xls
+                    'application/octet-stream' // Sometimes Excel files are detected as this
+                ];
+
+                const allowedExtensions = /\.(xlsx|xls)$/i;
+
+                if (allowedMimes.includes(file.mimetype) || allowedExtensions.test(file.originalname)) {
+                    cb(null, true);
+                } else {
+                    cb(new Error('Only Excel files (.xlsx, .xls) are allowed'), false);
+                }
+            }
+        });
     }
 
     // Get all questions with filtering and pagination
@@ -337,13 +368,190 @@ class QuestionController {
         }
     };
 
-    // Bulk import questions (placeholder for Excel import)
+    // Bulk import questions method
     bulkImportQuestions = async (req, res) => {
-        logger.info('Bulk import questions endpoint called');
-        res.status(501).json({
-            success: false,
-            message: 'Bulk import feature will be implemented in the next phase'
-        });
+        logger.info('Excel import endpoint called');
+
+        try {
+            // Validate file presence
+            if (!req.file) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'No Excel file provided'
+                });
+            }
+
+            // Validate file
+            const { error: fileError } = fileValidationSchema.validate({
+                mimetype: req.file.mimetype,
+                size: req.file.size,
+                originalname: req.file.originalname
+            });
+
+            if (fileError) {
+                return res.status(400).json({
+                    success: false,
+                    message: fileError.details[0].message
+                });
+            }
+
+            // Validate request body
+            const { error: bodyError, value } = excelImportSchema.validate(req.body);
+            if (bodyError) {
+                return res.status(400).json({
+                    success: false,
+                    message: bodyError.details[0].message
+                });
+            }
+
+            const { subjectCode } = value;
+            const ownerId = req.user.role === 'test_center_owner'
+                ? req.user._id
+                : req.user.testCenterOwner;
+
+            // Perform import
+            const result = await this.questionBankService.importQuestionsFromExcel(
+                req.file.buffer,
+                subjectCode,
+                ownerId,
+                req.user._id
+            );
+
+            if (result.success) {
+                res.status(200).json({
+                    success: true,
+                    message: result.message,
+                    data: result
+                });
+            } else {
+                res.status(400).json({
+                    success: false,
+                    message: result.message,
+                    data: result
+                });
+            }
+
+        } catch (error) {
+            logger.error('Excel import error:', error);
+            res.status(500).json({
+                success: false,
+                message: error.message || 'Failed to import questions from Excel'
+            });
+        }
+    };
+
+    // Preview Excel import method
+    previewExcelImport = async (req, res) => {
+        logger.info('Excel import preview endpoint called');
+
+        try {
+            // Validate file presence
+            if (!req.file) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'No Excel file provided'
+                });
+            }
+
+            // Validate file
+            const { error: fileError } = fileValidationSchema.validate({
+                mimetype: req.file.mimetype,
+                size: req.file.size,
+                originalname: req.file.originalname
+            });
+
+            if (fileError) {
+                return res.status(400).json({
+                    success: false,
+                    message: fileError.details[0].message
+                });
+            }
+
+            // Validate request body
+            const { error: bodyError, value } = previewImportSchema.validate(req.body);
+            if (bodyError) {
+                return res.status(400).json({
+                    success: false,
+                    message: bodyError.details[0].message
+                });
+            }
+
+            const { subjectCode, maxRows } = value;
+            const ownerId = req.user.role === 'test_center_owner'
+                ? req.user._id
+                : req.user.testCenterOwner;
+
+            // Generate preview
+            const preview = await this.questionBankService.previewExcelImport(
+                req.file.buffer,
+                subjectCode,
+                ownerId,
+                { maxRows }
+            );
+
+            res.status(200).json({
+                success: true,
+                data: preview
+            });
+
+        } catch (error) {
+            logger.error('Excel preview error:', error);
+            res.status(500).json({
+                success: false,
+                message: error.message || 'Failed to preview Excel import'
+            });
+        }
+    };
+
+    // Download Excel template
+    downloadExcelTemplate = async (req, res) => {
+        logger.info('Excel template download endpoint called');
+
+        try {
+            const ownerId = req.user.role === 'test_center_owner'
+                ? req.user._id
+                : req.user.testCenterOwner;
+
+            const templateBuffer = await this.questionBankService.generateExcelTemplate(ownerId);
+
+            // Set response headers for file download
+            res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+            res.setHeader('Content-Disposition', 'attachment; filename="question_import_template.xlsx"');
+            res.setHeader('Content-Length', templateBuffer.length);
+
+            res.send(templateBuffer);
+
+        } catch (error) {
+            logger.error('Excel template download error:', error);
+            res.status(500).json({
+                success: false,
+                message: error.message || 'Failed to generate Excel template'
+            });
+        }
+    };
+
+    // Get import batch status
+    getImportBatchStatus = async (req, res) => {
+        try {
+            const { batchId } = req.params;
+            const ownerId = req.user.role === 'test_center_owner'
+                ? req.user._id
+                : req.user.testCenterOwner;
+
+            const status = await this.questionBankService.getImportBatchStatus(batchId, ownerId);
+
+            res.status(200).json({
+                success: true,
+                data: status
+            });
+
+        } catch (error) {
+            logger.error('Get import batch status error:', error);
+            res.status(500).json({
+                success: false,
+                message: error.message || 'Failed to get import batch status'
+            });
+        }
     };
 }
 
