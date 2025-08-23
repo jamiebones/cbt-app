@@ -39,7 +39,13 @@ class AuthController {
                 });
             }
 
-            const result = await this.authService.login(email, password);
+            // Add request metadata for session tracking
+            const userMetadata = {
+                ip: req.ip || req.connection.remoteAddress,
+                userAgent: req.get('User-Agent') || 'Unknown'
+            };
+
+            const result = await this.authService.login(email, password, userMetadata);
 
             res.json({
                 success: true,

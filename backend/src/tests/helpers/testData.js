@@ -5,47 +5,25 @@ import { vi } from 'vitest';
 const generateObjectId = () => Math.random().toString(36).substring(2, 15);
 
 // Test user data generators
-export const createTestUser = (overrides = {}) => {
-    const user = {
-        id: generateObjectId(),
-        _id: generateObjectId(),
-        email: 'test@example.com',
+export const createTestUser = async (overrides = {}) => {
+    const { User } = await import('../../models/index.js');
+
+    const userData = {
+        email: overrides.email || 'test@example.com',
         password: 'hashedPassword123',
-        firstName: 'Test',
-        lastName: 'User',
-        role: 'test_center_owner',
+        firstName: overrides.firstName || 'Test',
+        lastName: overrides.lastName || 'User',
+        role: overrides.role || 'test_center_owner',
         testCenterName: 'Test Center',
         subscriptionTier: 'free',
         subscriptionExpiry: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
         isActive: true,
         loginAttempts: 0,
         accountLockedUntil: null,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        // Add mock methods
-        toJSON: function () {
-            const obj = { ...this };
-            delete obj.password; // Remove password from JSON
-            delete obj.toJSON; // Remove methods
-            delete obj.save;
-            delete obj.comparePassword;
-            delete obj.incrementLoginAttempts;
-            delete obj.resetLoginAttempts;
-            delete obj.createPasswordResetToken;
-            return obj;
-        },
-        save: vi.fn().mockResolvedValue(this),
-        comparePassword: vi.fn(),
-        incrementLoginAttempts: vi.fn(),
-        resetLoginAttempts: vi.fn(),
-        createPasswordResetToken: vi.fn(),
         ...overrides
     };
 
-    // Ensure methods are bound to the user object
-    user.save = vi.fn().mockResolvedValue(user);
-
-    return user;
+    return await User.create(userData);
 };
 
 export const createTestCreator = (testCenterOwnerId) => ({
@@ -71,56 +49,65 @@ export const createTestStudent = () => ({
     isEmailVerified: true
 });
 
-// Test subject data
-export const createTestSubject = (ownerId, overrides = {}) => ({
-    _id: new mongoose.Types.ObjectId(),
-    name: 'Mathematics',
-    code: 'MATH101',
-    description: 'Basic Mathematics',
-    testCenterOwner: ownerId,
-    createdBy: ownerId,
-    isActive: true,
-    stats: {
-        questionCount: 0,
-        testCount: 0,
-        averageDifficulty: 'medium'
-    },
-    ...overrides
-});
+// Test data (async versions that work with actual models)
+export const createTestSubject = async (overrides = {}) => {
+    const { Subject } = await import('../../models/index.js');
 
-// Test question data
-export const createTestQuestion = (subjectId, ownerId, overrides = {}) => ({
-    _id: new mongoose.Types.ObjectId(),
-    questionText: 'What is 2 + 2?',
-    type: 'multiple_choice',
-    difficulty: 'easy',
-    points: 10,
-    subject: subjectId,
-    testCenterOwner: ownerId,
-    createdBy: ownerId,
-    isActive: true,
-    answers: [
-        { id: 'A', text: '3', isCorrect: false },
-        { id: 'B', text: '4', isCorrect: true },
-        { id: 'C', text: '5', isCorrect: false },
-        { id: 'D', text: '6', isCorrect: false }
-    ],
-    ...overrides
-});
+    const subjectData = {
+        name: overrides.name || 'Test Subject',
+        description: overrides.description || 'A test subject',
+        testCenterOwner: overrides.testCenterOwner,
+        isActive: true,
+        ...overrides
+    };
 
-// Test data
-export const createTestData = (ownerId, overrides = {}) => ({
-    _id: new mongoose.Types.ObjectId(),
-    title: 'Sample Math Test',
-    description: 'A basic mathematics test',
-    duration: 30, // minutes
-    passingScore: 70,
-    totalQuestions: 5,
-    testCenterOwner: ownerId,
-    createdBy: ownerId,
-    status: 'draft',
-    ...overrides
-});
+    return await Subject.create(subjectData);
+};
+
+export const createTestQuestion = async (overrides = {}) => {
+    const { Question } = await import('../../models/index.js');
+
+    const questionData = {
+        questionText: overrides.questionText || 'Sample question?',
+        type: overrides.type || 'multiple_choice',
+        options: overrides.options || ['Option A', 'Option B', 'Option C', 'Option D'],
+        correctAnswer: overrides.correctAnswer !== undefined ? overrides.correctAnswer : 0,
+        points: overrides.points || 1,
+        subject: overrides.subject,
+        testCenterOwner: overrides.testCenterOwner,
+        difficulty: overrides.difficulty || 'medium',
+        tags: overrides.tags || [],
+        explanation: overrides.explanation || 'Sample explanation',
+        isActive: true,
+        ...overrides
+    };
+
+    return await Question.create(questionData);
+};
+
+export const createTestTest = async (overrides = {}) => {
+    const { Test } = await import('../../models/index.js');
+
+    const testData = {
+        title: overrides.title || 'Sample Test',
+        description: overrides.description || 'A sample test for testing purposes',
+        duration: overrides.duration || 60, // minutes
+        totalQuestions: overrides.totalQuestions || 10,
+        passingScore: overrides.passingScore || 70,
+        questionSelectionMethod: overrides.questionSelectionMethod || 'manual',
+        questions: overrides.questions || [],
+        subjects: overrides.subjects || [],
+        testCenterOwner: overrides.testCenterOwner,
+        createdBy: overrides.createdBy,
+        status: overrides.status || 'draft',
+        isActive: true,
+        ...overrides
+    };
+
+    return await Test.create(testData);
+};
+
+// Authentication data
 
 // Authentication data
 export const createAuthData = () => ({
@@ -176,4 +163,92 @@ export const SUCCESS_MESSAGES = {
     PASSWORD_RESET: 'Password reset successful',
     PASSWORD_CHANGED: 'Password changed successfully',
     EMAIL_SENT: 'Email sent successfully'
+};
+
+// Analytics test data generators
+export const createTestAnalyticsData = () => {
+    const testId = generateObjectId();
+    return {
+        testId,
+        test: {
+            _id: testId,
+            title: 'Basic Math Test',
+            description: 'Test covering basic arithmetic',
+            totalQuestions: 10,
+            passingScore: 70
+        },
+        basicStats: [{
+            totalAttempts: 5,
+            completedAttempts: 4,
+            averageScore: 75.5,
+            highestScore: 95,
+            lowestScore: 45,
+            passRate: 0.75,
+            averageDuration: 1800,
+            abandonmentRate: 0.2
+        }]
+    };
+};
+
+export const createCenterData = () => {
+    const centerId = generateObjectId();
+    return {
+        centerId,
+        center: {
+            _id: centerId,
+            firstName: 'Center',
+            lastName: 'Owner',
+            email: 'owner@test.com',
+            businessName: 'Test Center'
+        },
+        stats: [{
+            totalSessions: 15,
+            completedSessions: 12,
+            averageScore: 78.5,
+            passRate: 0.75,
+            totalTests: 3,
+            totalStudents: 8
+        }]
+    };
+};
+
+export const createStudentData = () => {
+    const studentId = generateObjectId();
+    const centerId = generateObjectId();
+    return {
+        studentId,
+        centerId,
+        student: {
+            _id: studentId,
+            firstName: 'John',
+            lastName: 'Doe',
+            email: 'john@test.com'
+        },
+        stats: [{
+            totalAttempts: 5,
+            averageScore: 82.5,
+            highestScore: 95,
+            passRate: 80,
+            totalDuration: 9000
+        }]
+    };
+};
+
+export const createDashboardData = () => {
+    const centerId = generateObjectId();
+    return {
+        centerId,
+        stats: [{
+            recentActivity: [
+                { type: 'test_completed', details: 'Math Test', timestamp: new Date() },
+                { type: 'student_registered', details: 'John Doe', timestamp: new Date() }
+            ],
+            performanceMetrics: {
+                totalTests: 10,
+                totalStudents: 50,
+                averageScore: 78.5,
+                completionRate: 85
+            }
+        }]
+    };
 };

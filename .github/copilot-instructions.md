@@ -48,6 +48,13 @@ This is a **monolithic MERN stack** Computer-Based Testing application with Dock
 - **Respect user preferences** - After explaining alternatives, implement what the user prefers
 - **Focus on performance and maintainability** - Prioritize solutions that align with the performance standards above
 
+**Quality Standards (CRITICAL):**
+
+- **Never present partial success as acceptable** - Don't suggest half-baked answers like "6 out of 10 tests passing is progress"
+- **100% success requirement** - 6/10 is a 60% failure rate and completely unacceptable in professional development
+- **Complete solutions only** - Always investigate and fix ALL issues until 100% success is achieved
+- **No compromise on standards** - Software either works completely or it doesn't work - there's no acceptable middle ground
+
 ## Development Patterns
 
 ### Module Structure (Critical Pattern)

@@ -2,6 +2,7 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { User } from '../../models/index.js';
 import { logger } from '../../config/logger.js';
+import { redisService } from '../../services/redisService.js';
 
 class AuthService {
     constructor() {
@@ -21,36 +22,76 @@ class AuthService {
     async generateTokens(user) {
         logger.info(`Generating tokens for user: ${user.id}`);
 
-        const payload = {
+        // Generate unique token IDs for tracking
+        const accessTokenId = crypto.randomUUID();
+        const refreshTokenId = crypto.randomUUID();
+
+        const accessPayload = {
             id: user.id,
             email: user.email,
             role: user.role,
             subscriptionTier: user.subscriptionTier,
-            testCenterOwner: user.testCenterOwner
+            testCenterOwner: user.testCenterOwner,
+            jti: accessTokenId,
+            tokenType: 'access'
+        };
+
+        const refreshPayload = {
+            id: user.id,
+            type: 'refresh',
+            jti: refreshTokenId
         };
 
         // Generate access token (short-lived)
-        const accessToken = jwt.sign(payload, this.JWT_SECRET, {
+        const accessToken = jwt.sign(accessPayload, this.JWT_SECRET, {
             expiresIn: this.JWT_EXPIRES_IN,
             issuer: 'cbt-app',
             audience: 'cbt-users'
         });
 
         // Generate refresh token (long-lived)
-        const refreshToken = jwt.sign(
-            { id: user.id, type: 'refresh' },
-            this.JWT_REFRESH_SECRET,
-            {
-                expiresIn: this.JWT_REFRESH_EXPIRES_IN,
-                issuer: 'cbt-app',
-                audience: 'cbt-users'
-            }
+        const refreshToken = jwt.sign(refreshPayload, this.JWT_REFRESH_SECRET, {
+            expiresIn: this.JWT_REFRESH_EXPIRES_IN,
+            issuer: 'cbt-app',
+            audience: 'cbt-users'
+        });
+
+        // Store refresh token in Redis
+        const refreshExpiresIn = this._parseTimeToSeconds(this.JWT_REFRESH_EXPIRES_IN);
+        const tokenId = await redisService.storeRefreshToken(
+            (user.id || user._id || 'unknown').toString(),
+            refreshToken,
+            refreshExpiresIn
         );
+
+        // Store session information
+        const sessionData = {
+            tokenId,
+            accessTokenId,
+            refreshTokenId,
+            userAgent: user.userAgent || 'Unknown',
+            ip: user.ip || 'Unknown',
+            loginTime: new Date().toISOString()
+        };
+
+        const sessionId = await redisService.storeSession(
+            (user.id || user._id || 'unknown').toString(),
+            sessionData,
+            refreshExpiresIn
+        );
+
+        logger.info(`Tokens generated for user ${user.id || user._id || 'unknown'}`, {
+            accessTokenId,
+            refreshTokenId,
+            sessionId
+        });
 
         return {
             accessToken,
             refreshToken,
-            expiresIn: this.JWT_EXPIRES_IN
+            expiresIn: this.JWT_EXPIRES_IN,
+            tokenId,
+            sessionId
         };
     }
 
@@ -68,6 +109,12 @@ class AuthService {
                 issuer: 'cbt-app',
                 audience: 'cbt-users'
             });
+
+            // Check if token is blacklisted
+            if (decoded.jti && await redisService.isTokenBlacklisted(decoded.jti)) {
+                logger.warn(`Access token is blacklisted: ${decoded.jti}`);
+                return null;
+            }
 
             const user = await User.findById(decoded.id);
             if (!user || !user.isActive) {
@@ -93,6 +140,19 @@ class AuthService {
             if (decoded.type !== 'refresh') {
                 logger.warn('Invalid refresh token type');
                 return null;
+            }
+
+            // Check Redis for stored refresh token
+            if (decoded.jti) {
+                const storedTokenData = await redisService.validateRefreshToken(
+                    (decoded.id || decoded.userId || 'unknown').toString(),
+                    decoded.jti
+                );
+
+                if (!storedTokenData) {
+                    logger.warn(`Refresh token not found in Redis: ${decoded.jti}`);
+                    return null;
+                }
             }
 
             const user = await User.findById(decoded.id);
@@ -329,11 +389,115 @@ class AuthService {
         }
     }
 
-    // Logout (invalidate tokens - would require token blacklist in production)
-    async logout(userId) {
-        logger.info('User logged out', { userId });
-        // In a full implementation, you would add the token to a blacklist
-        return { message: 'Logged out successfully' };
+    // Logout (invalidate tokens and sessions)
+    async logout(userId, tokenId = null, sessionId = null) {
+        logger.info('User logging out', { userId, tokenId, sessionId });
+
+        try {
+            const promises = [];
+
+            if (tokenId) {
+                // Revoke specific refresh token
+                promises.push(redisService.revokeRefreshToken(userId.toString(), tokenId));
+            } else {
+                // Revoke all refresh tokens for user
+                promises.push(redisService.revokeAllRefreshTokens(userId.toString()));
+            }
+
+            if (sessionId) {
+                // End specific session
+                promises.push(redisService.endSession(userId.toString(), sessionId));
+            }
+
+            // Invalidate user cache
+            promises.push(redisService.invalidateUserCache(userId.toString()));
+
+            await Promise.all(promises);
+
+            logger.info('User logged out successfully', { userId });
+            return { message: 'Logged out successfully' };
+        } catch (error) {
+            logger.error('Logout failed:', error);
+            throw new Error('Logout failed');
+        }
+    }
+
+    // Logout with token invalidation
+    async logoutWithTokens(accessToken, refreshToken) {
+        try {
+            // Blacklist the access token
+            await this.blacklistToken(accessToken);
+
+            // Extract user information from refresh token to revoke it
+            if (refreshToken) {
+                const tokenData = await redisService.validateRefreshTokenByToken(refreshToken);
+                if (tokenData) {
+                    await redisService.revokeRefreshToken(tokenData.userId, tokenData.tokenId);
+                    // Invalidate user cache
+                    await redisService.invalidateUserCache(tokenData.userId);
+                }
+            }
+
+            logger.info('User logged out with tokens successfully');
+            return { message: 'Logged out successfully' };
+        } catch (error) {
+            logger.error('Logout with tokens failed:', error);
+            throw new Error('Logout failed');
+        }
+    }
+
+    // Logout from all devices
+    async logoutAllDevices(userId) {
+        logger.info('User logging out from all devices', { userId });
+
+        try {
+            await Promise.all([
+                redisService.revokeAllRefreshTokens(userId.toString()),
+                redisService.invalidateUserCache(userId.toString())
+            ]);
+
+            logger.info('User logged out from all devices successfully', { userId });
+            return { message: 'Logged out from all devices successfully' };
+        } catch (error) {
+            logger.error('Logout all devices failed:', error);
+            throw new Error('Logout failed');
+        }
+    }
+
+    // Blacklist access token (for immediate revocation)
+    async blacklistToken(token) {
+        try {
+            const decoded = jwt.decode(token);
+            if (decoded && decoded.jti && decoded.exp) {
+                const expiresIn = decoded.exp - Math.floor(Date.now() / 1000);
+                if (expiresIn > 0) {
+                    await redisService.blacklistToken(decoded.jti, expiresIn);
+                    logger.info('Token blacklisted', { tokenId: decoded.jti });
+                }
+            }
+        } catch (error) {
+            logger.error('Failed to blacklist token:', error);
+        }
+    }
+
+    // Helper method to parse time strings to seconds
+    _parseTimeToSeconds(timeString) {
+        const units = {
+            's': 1,
+            'm': 60,
+            'h': 3600,
+            'd': 86400,
+            'w': 604800
+        };
+
+        const match = timeString.match(/^(\d+)([smhdw])$/);
+        if (!match) {
+            // Default to 7 days if parsing fails
+            return 7 * 24 * 60 * 60;
+        }
+
+        const [, value, unit] = match;
+        return parseInt(value) * (units[unit] || 1);
     }
 
     // Validation helpers

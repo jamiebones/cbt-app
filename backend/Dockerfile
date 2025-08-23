@@ -29,7 +29,7 @@ RUN npm install -g nodemon
 
 # Copy package files
 COPY package*.json ./
-RUN npm ci
+RUN npm ci --include=dev
 
 # Copy source code
 COPY . .

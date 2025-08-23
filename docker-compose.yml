@@ -92,7 +92,7 @@ services:
 
   # MongoDB - Main Database
   mongo:
-    image: mongo:6
+    image: mongo:7
     ports:
       - "27017:27017"
     volumes:
@@ -107,7 +107,7 @@ services:
 
   # MongoDB - Local Database for Offline Operations
   local-mongo:
-    image: mongo:6
+    image: mongo:7
     ports:
       - "27018:27017"
     volumes:

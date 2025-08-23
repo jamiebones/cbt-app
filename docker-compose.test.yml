@@ -1,0 +1,55 @@
+version: '3.8'
+services:
+  mongodb-test:
+    image: mongo:7
+    container_name: cbt-mongo-test
+    ports:
+      - "27019:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: test_password_123
+      MONGO_INITDB_DATABASE: cbt_test
+    volumes:
+      - ./docker/mongo-init/test-init-db.js:/docker-entrypoint-initdb.d/init-db.js
+    networks:
+      - cbt-test-network
+
+  redis-test:
+    image: redis:7-alpine
+    container_name: cbt-redis-test
+    ports:
+      - "6381:6379"
+    command: redis-server --requirepass test_redis_123
+    networks:
+      - cbt-test-network
+
+  backend-test:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: development
+    container_name: cbt-backend-test
+    depends_on:
+      - mongodb-test
+      - redis-test
+    environment:
+      NODE_ENV: test
+      MONGODB_URI: mongodb://cbt_test_user:cbt_test_password@mongodb-test:27017/cbt_test
+      REDIS_URL: redis://redis-test:6379
+      REDIS_PASSWORD: test_redis_123
+      LOG_LEVEL: error
+    volumes:
+      - ./backend/src:/app/src:ro
+      - ./backend/package.json:/app/package.json:ro
+      - ./backend/vitest.config.integration.js:/app/vitest.config.integration.js:ro
+      - ./backend/vitest.config.js:/app/vitest.config.js:ro
+    networks:
+      - cbt-test-network
+    command: npm run test:integration
+
+networks:
+  cbt-test-network:
+    driver: bridge
+
+volumes:
+  node_modules_cache:
