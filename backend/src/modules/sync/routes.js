@@ -3,13 +3,14 @@ import { syncController } from './controller.js';
 
 const router = express.Router();
 
-// Data synchronization routes
-router.post('/download/users', syncController.downloadUsers);
-router.post('/download/tests', syncController.downloadTests);
-router.post('/upload/results', syncController.uploadResults);
+// Data synchronization routes for offline test centers
+router.post('/download-users', syncController.downloadUsers);
+router.get('/download-tests/:packageId', syncController.downloadTests);
+router.post('/export-package', syncController.exportPackage);
+router.post('/upload-results', syncController.uploadResults);
 
-// Sync status routes
-router.get('/status', syncController.getSyncStatus);
-router.post('/status/update', syncController.updateSyncStatus);
+// Sync status management routes
+router.get('/status/:testCenterId', syncController.getSyncStatus);
+router.put('/status', syncController.updateSyncStatus);
 
 export default router;

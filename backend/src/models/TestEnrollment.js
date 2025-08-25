@@ -36,7 +36,7 @@ const testEnrollmentSchema = new Schema({
         min: [0, 'Payment amount cannot be negative']
     },
 
- 
+
     transactionId: {
         type: String,
         trim: true,
@@ -81,11 +81,44 @@ const testEnrollmentSchema = new Schema({
         index: true
     },
 
+    // Sync Status for Offline Testing
+    syncStatus: {
+        type: String,
+        enum: {
+            values: ['registered', 'downloaded', 'test_taken', 'results_uploaded'],
+            message: 'Invalid sync status'
+        },
+        default: 'registered',
+        index: true
+    },
+
+    // Test Schedule
+    scheduledDate: {
+        type: Date,
+        required: false
+    },
+
+    scheduledTime: {
+        startTime: String, // "09:00"
+        endTime: String,   // "11:00"  
+        duration: Number   // in minutes
+    },
+
+    // Sync Metadata
+    syncMetadata: {
+        downloadedAt: Date,
+        downloadedBy: String, // Test center identifier
+        packageId: String,    // ID of sync package
+        lastModified: {
+            type: Date,
+            default: Date.now
+        }
+    },
+
     // Timestamps
     enrolledAt: {
         type: Date
     },
-
 
     cancelledAt: {
         type: Date
@@ -122,6 +155,9 @@ testEnrollmentSchema.index({ test: 1, student: 1 }, { unique: true });
 testEnrollmentSchema.index({ accessCode: 1, test: 1 });
 testEnrollmentSchema.index({ testCenterOwner: 1, createdAt: -1 });
 testEnrollmentSchema.index({ paymentStatus: 1, enrollmentStatus: 1 });
+testEnrollmentSchema.index({ syncStatus: 1, testCenterOwner: 1 });
+testEnrollmentSchema.index({ scheduledDate: 1, syncStatus: 1 });
+testEnrollmentSchema.index({ 'syncMetadata.lastModified': 1 });
 testEnrollmentSchema.index({ expiresAt: 1 }, { sparse: true });
 
 // Virtual properties
@@ -157,6 +193,11 @@ testEnrollmentSchema.pre('save', function (next) {
     // Mark access code used timestamp
     if (this.isModified('accessCodeUsed') && this.accessCodeUsed && !this.accessCodeUsedAt) {
         this.accessCodeUsedAt = new Date();
+    }
+
+    // Update sync metadata timestamp
+    if (this.isModified(['syncStatus', 'scheduledDate', 'scheduledTime'])) {
+        this.syncMetadata.lastModified = new Date();
     }
 
     next();
