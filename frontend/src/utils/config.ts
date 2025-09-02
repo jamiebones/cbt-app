@@ -52,9 +52,9 @@ export const API_ENDPOINTS = {
   // Authentication
   LOGIN: '/api/auth/login',
   REGISTER: '/api/auth/register',
-  REFRESH: '/api/auth/refresh',
+  REFRESH: '/api/auth/refresh-token',
   LOGOUT: '/api/auth/logout',
-  PROFILE: '/api/auth/profile',
+  PROFILE: '/api/auth/me',
   
   // Users
   USERS: '/api/users',

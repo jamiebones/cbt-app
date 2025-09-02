@@ -34,7 +34,7 @@ const buildInitialState = (): AuthState => {
     token: token || null,
     refreshToken: authStorage.getRefreshToken() || null,
     isAuthenticated: !!(user && token),
-    isLoading: false,
+    isLoading: !!(user && token), // Set loading to true if we have stored auth data
   };
 };
 
@@ -82,7 +82,7 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
         ...state,
         user: action.payload.user,
         token: action.payload.token,
-        refreshToken: null, 
+        refreshToken: null,
         isAuthenticated: true,
         isLoading: false,
       };
@@ -152,7 +152,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       await authService.logout();
     } catch (error) {
-        console.warn("Logout error:", error);
+      console.warn("Logout error:", error);
     } finally {
       authStorage.clearAuth();
       dispatch({ type: "LOGOUT" });
@@ -206,22 +206,25 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     const initializeAuth = async () => {
       const token = authStorage.getToken();
       if (token) {
+        dispatch({ type: "AUTH_START" }); // Ensure loading is true while verifying
         try {
           const user = await authService.getProfile();
           if (user) {
             authStorage.setUser(user);
             dispatch({ type: "RESTORE_AUTH", payload: { user, token } });
           } else {
+            authStorage.clearAuth();
             dispatch({ type: "LOGOUT" });
           }
         } catch (err) {
           if (process.env.NODE_ENV !== "production") {
             console.warn("Auth profile fetch error:", err);
           }
+          authStorage.clearAuth();
           dispatch({ type: "LOGOUT" });
         }
       } else {
-        dispatch({ type: "LOGOUT" });
+        dispatch({ type: "LOGOUT" }); // Ensure loading is false if no token
       }
     };
     initializeAuth();

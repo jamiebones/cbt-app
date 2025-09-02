@@ -14,10 +14,10 @@ export const getToken = (): string | null => {
   }
 };
 
-export const setToken = (token: string | null) => {
+export const setToken = (token: string | null | undefined) => {
   try {
     if (typeof window === "undefined") return;
-    if (token === null) localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
+    if (!token) localStorage.removeItem(STORAGE_KEYS.AUTH_TOKEN);
     else localStorage.setItem(STORAGE_KEYS.AUTH_TOKEN, token);
   } catch (err) {
     console.warn("authStorage.setToken error", err);
@@ -33,10 +33,10 @@ export const getRefreshToken = (): string | null => {
   }
 };
 
-export const setRefreshToken = (token: string | null) => {
+export const setRefreshToken = (token: string | null | undefined) => {
   try {
     if (typeof window === "undefined") return;
-    if (token === null) localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
+    if (!token) localStorage.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
     else localStorage.setItem(STORAGE_KEYS.REFRESH_TOKEN, token);
   } catch (err) {
     console.warn("authStorage.setRefreshToken error", err);

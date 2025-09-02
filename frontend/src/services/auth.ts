@@ -12,14 +12,14 @@ class AuthService {
   // Login user
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
     try {
-      const response = await mainApi.post<ApiResponse<AuthResponse>>(
-        API_ENDPOINTS.LOGIN,
-        credentials
-      );
-      
-      const authData = handleApiResponse(response);
+      const response = await mainApi.post<ApiResponse<any>>(API_ENDPOINTS.LOGIN, credentials);
+      const apiData = handleApiResponse(response);
+      const authData: AuthResponse = {
+        user: apiData.user,
+        token: apiData.accessToken, // map accessToken to token
+        refreshToken: apiData.refreshToken,
+      };
       this.storeAuthData(authData);
-      
       return authData;
     } catch (error: any) {
       throw new Error(handleApiError(error));
@@ -29,14 +29,14 @@ class AuthService {
   // Register new test center
   async register(data: RegisterData): Promise<AuthResponse> {
     try {
-      const response = await mainApi.post<ApiResponse<AuthResponse>>(
-        API_ENDPOINTS.REGISTER,
-        data
-      );
-      
-      const authData = handleApiResponse(response);
+      const response = await mainApi.post<ApiResponse<any>>(API_ENDPOINTS.REGISTER, data);
+      const apiData = handleApiResponse(response);
+      const authData: AuthResponse = {
+        user: apiData.user,
+        token: apiData.accessToken, // map accessToken to token
+        refreshToken: apiData.refreshToken,
+      };
       this.storeAuthData(authData);
-      
       return authData;
     } catch (error: any) {
       throw new Error(handleApiError(error));
