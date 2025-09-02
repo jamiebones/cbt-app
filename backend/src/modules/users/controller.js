@@ -1,4 +1,5 @@
 import { logger } from '../../config/logger.js';
+import userService from './service.js';
 
 class UserController {
     getUsers = async (req, res) => {
@@ -62,6 +63,15 @@ class UserController {
         res.status(501).json({
             success: false,
             message: 'Register student not implemented yet'
+        });
+    };
+
+    createTestCenterOwner = async (req, res) => {
+        logger.info('Create test center owner endpoint called');
+        await userService.createTestCenterOwner(req.body);
+        res.status(201).json({
+            success: true,
+            message: 'Test center owner created successfully'
         });
     };
 }

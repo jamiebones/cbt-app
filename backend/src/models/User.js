@@ -46,9 +46,10 @@ const userSchema = new Schema({
         trim: true,
         validate: {
             validator: function (phone) {
-                return !phone || /^[\+]?[1-9][\d]{0,15}$/.test(phone);
+                // Must be exactly 11 digits, can start with zero, no plus sign
+                return !phone || /^\d{11}$/.test(phone);
             },
-            message: 'Please provide a valid phone number'
+            message: 'Phone number must be exactly 11 digits'
         }
     },
 
@@ -107,7 +108,7 @@ const userSchema = new Schema({
         }
     },
 
- 
+
     // Subscription Information (for test center owners)
     subscriptionTier: {
         type: String,
@@ -118,7 +119,7 @@ const userSchema = new Schema({
         default: 'free'
     },
 
-  
+
     subscriptionLimits: {
         maxTests: {
             type: Number,
@@ -134,7 +135,7 @@ const userSchema = new Schema({
         },
         canImportExcel: {
             type: Boolean,
-            default: true 
+            default: true
         },
         canUseAnalytics: {
             type: Boolean,

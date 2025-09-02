@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
+import { API_ENDPOINTS } from "@/utils/config";
 
 const initialForm = {
   email: "",
@@ -68,7 +69,7 @@ export default function RegisterCenterOwnerPage() {
     setError("");
     try {
       // Replace with actual API call
-      await mainApi.post("/register-center-owner", form);
+      await mainApi.post(API_ENDPOINTS.TEST_CENTER_OWNERS, form);
       router.push("/dashboard");
     } catch (err: any) {
       setError(err?.message || "Registration failed");
@@ -197,7 +198,11 @@ export default function RegisterCenterOwnerPage() {
           />
         </div>
         {error && <div className="text-red-500">{error}</div>}
-        <Button type="submit" disabled={loading} className="w-full">
+        <Button
+          type="submit"
+          disabled={loading}
+          className="w-full bg-green-600 hover:bg-green-700 text-white"
+        >
           {loading ? "Registering..." : "Register Center Owner"}
         </Button>
       </form>

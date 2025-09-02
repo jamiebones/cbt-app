@@ -1,7 +1,47 @@
 import { User } from '../../models/index.js';
 import { logger } from '../../config/logger.js';
+import test from 'node:test';
 
 class UserService {
+    async createTestCenterOwner(data) {
+        logger.info('Creating test center owner', { email: data.email });
+        // Validate required fields
+        const requiredFields = [
+            'email', 'password', 'firstName', 'lastName', 'phoneNumber', 'testCenterName', 'testCenterAddress'
+        ];
+        for (const field of requiredFields) {
+            if (!data[field]) {
+                throw new Error(`Missing required field: ${field}`);
+            }
+        }
+        // Check if user already exists
+        const existing = await User.findOne({ email: data.email });
+        if (existing) {
+            throw new Error('A user with this email already exists');
+        }
+        // Create new user with role 'test_center_owner'
+        const userData = {
+            email: data.email,
+            password: data.password, // Should be hashed in model middleware
+            firstName: data.firstName,
+            lastName: data.lastName,
+            phoneNumber: data.phoneNumber,
+            testCenterName: data.testCenterName,
+            role: 'test_center_owner',
+            testCenterAddress: {
+                street: data.testCenterAddress.street,
+                city: data.testCenterAddress.city,
+                state: data.testCenterAddress.state,
+                country: data.testCenterAddress.country,
+            },
+        };
+
+   
+        const newUser = new User(userData);
+        await newUser.save();
+        logger.info(`Test center owner created: ${newUser.email}`);
+        return newUser;
+    }
     async findById(id) {
         logger.debug(`Finding user by id: ${id}`);
         try {

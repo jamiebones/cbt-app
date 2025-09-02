@@ -60,7 +60,8 @@ export const API_ENDPOINTS = {
   USERS: '/api/users',
   TEST_CREATORS: '/api/users/test-creators',
   STUDENTS: '/api/users/students',
-  
+  TEST_CENTER_OWNERS: '/api/users/center/create-test-center-owners',
+
   // Tests
   TESTS: '/api/tests',
   TEST_SESSIONS: '/api/tests/sessions',

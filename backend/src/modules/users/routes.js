@@ -14,5 +14,6 @@ router.delete('/:id', userController.deleteUser);
 router.get('/center/:centerId', userController.getUsersByCenter);
 router.post('/center/:centerId/creators', userController.createTestCreator);
 router.post('/center/:centerId/students', userController.registerStudent);
+router.post('/center/create-test-center-owners', userController.createTestCenterOwner);
 
 export default router;
