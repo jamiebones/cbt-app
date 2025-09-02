@@ -1,51 +1,30 @@
-# Multi-stage Dockerfile for React Frontend
-FROM node:18-alpine AS base
+# Simplified Dockerfile for Next.js Frontend
+FROM node:22.13.0-alpine
 
-# Install dependencies only when needed
-FROM base AS deps
+# Install dependencies for better compatibility
+RUN apk add --no-cache libc6-compat
+
+# Set working directory
 WORKDIR /app
+
+# Install pnpm globally
+RUN npm install -g pnpm
 
 # Copy package files
-COPY package*.json ./
-RUN npm ci --only=production && npm cache clean --force
-
-# Development stage
-FROM base AS development
-WORKDIR /app
+COPY package.json ./
 
 # Install dependencies
-COPY package*.json ./
-RUN npm ci
+RUN npm install
 
-# Copy source code
-COPY . .
+# Note: Source code is mounted via volume in docker-compose.yml
+# This allows for hot reloading during development
 
 # Expose port
 EXPOSE 3000
 
-# Set environment for hot reloading
-ENV CHOKIDAR_USEPOLLING=true
-ENV WATCHPACK_POLLING=true
+# Set environment variables
+ENV NODE_ENV=development
+ENV NEXT_TELEMETRY_DISABLED=1
 
-# Start development server with hot reload
-CMD ["npm", "start"]
-
-# Build stage
-FROM base AS builder
-WORKDIR /app
-
-# Copy package files
-COPY package*.json ./
-RUN npm ci
-
-# Copy source code
-COPY . .
-
-# Build the application
-RUN npm run build
-
-# Production stage - Build output only (served by main nginx)
-FROM scratch AS production
-
-# Copy built assets (this stage is used to extract build files)
-COPY --from=builder /app/build /build
+# Start development server
+CMD ["npm", "run", "dev"]

@@ -1,11 +1,13 @@
-import { Navigate, useLocation } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
-import { User } from '../types';
-import LoadingSpinner from './LoadingSpinner';
+"use client";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/contexts/AuthContext";
+import { User } from "@/types";
+import LoadingSpinner from "./LoadingSpinner";
+import { useEffect } from "react";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  requiredRole?: User['role'];
+  requiredRole?: User["role"];
   requiredAuth?: boolean;
 }
 
@@ -15,31 +17,56 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   requiredAuth = true,
 }) => {
   const { state } = useAuth();
-  const location = useLocation();
+  const router = useRouter();
 
-  // Show loading spinner while checking authentication
+  useEffect(() => {
+    // Check if authentication is required
+    if (requiredAuth && !state.isAuthenticated && !state.isLoading) {
+      router.push("/login");
+      return;
+    }
+
+    // Check if specific role is required
+    if (requiredRole && state.user?.role !== requiredRole && !state.isLoading) {
+      // Redirect based on user role
+      switch (state.user?.role) {
+        case "super_admin":
+          router.push("/admin");
+          break;
+        case "test_center_owner":
+        case "test_creator":
+          router.push("/dashboard");
+          break;
+        case "student":
+          router.push("/test-selection");
+          break;
+        default:
+          router.push("/login");
+          break;
+      }
+    }
+  }, [
+    state.isAuthenticated,
+    state.isLoading,
+    state.user?.role,
+    requiredAuth,
+    requiredRole,
+    router,
+  ]);
+
+  // Always show spinner while loading
   if (state.isLoading) {
     return <LoadingSpinner />;
   }
 
-  // Check if authentication is required
+  // Only redirect if not authenticated and not loading (handled in useEffect)
   if (requiredAuth && !state.isAuthenticated) {
-    // Redirect to login with the current location
-    return <Navigate to="/login" state={{ from: location }} replace />;
+    return <LoadingSpinner />;
   }
 
-  // Check if specific role is required
+  // Only show spinner if role mismatch and not loading
   if (requiredRole && state.user?.role !== requiredRole) {
-    // Redirect based on user role
-    switch (state.user?.role) {
-      case 'test_center_owner':
-      case 'test_creator':
-        return <Navigate to="/dashboard" replace />;
-      case 'student':
-        return <Navigate to="/test-selection" replace />;
-      default:
-        return <Navigate to="/login" replace />;
-    }
+    return <LoadingSpinner />;
   }
 
   // User is authenticated and has the required role

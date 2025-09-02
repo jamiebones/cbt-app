@@ -1,45 +1,31 @@
-# Dependencies
-/node_modules
-/.pnp
-.pnp.js
+# Next.js build output
+.next/
+out/
 
-# Testing
-/coverage
+# Node modules
+node_modules/
 
-# Production build
-/build
-
-# Misc
-.DS_Store
+# Environment variables
+.env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
 
-# Logs
+# Log files
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
-# Runtime data
-pids
-*.pid
-*.seed
-*.pid.lock
+# OS-specific files
+.DS_Store
+Thumbs.db
 
 # IDE files
 .vscode/
 .idea/
+
+# Misc
 *.swp
 *.swo
-
-# OS generated files
-Thumbs.db
-
-# Temporary files
-*.tmp
-*.temp
-.cache/
-
-# Only exclude yarn.lock if using npm, keep package-lock.json
-yarn.lock
+*.log

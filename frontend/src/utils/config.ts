@@ -25,25 +25,25 @@ const getEnvNumber = (name: string, defaultValue = 0): number => {
 
 // Application configuration
 export const config: AppConfig = {
-  apiUrl: getEnvVar('REACT_APP_API_URL', 'http://localhost:4000'),
-  localServerUrl: getEnvVar('REACT_APP_LOCAL_SERVER_URL', 'http://localhost:5000'),
-  environment: (getEnvVar('REACT_APP_ENVIRONMENT', 'development') as 'development' | 'production'),
+  apiUrl: getEnvVar('NEXT_PUBLIC_API_URL', 'http://localhost:4000'),
+  localServerUrl: getEnvVar('NEXT_PUBLIC_LOCAL_SERVER_URL', 'http://localhost:5000'),
+  environment: (getEnvVar('NEXT_PUBLIC_ENVIRONMENT', 'development') as 'development' | 'production'),
   
   features: {
-    calculator: getEnvBool('REACT_APP_ENABLE_CALCULATOR', true),
-    mediaUpload: getEnvBool('REACT_APP_ENABLE_MEDIA_UPLOAD', true),
-    excelImport: getEnvBool('REACT_APP_ENABLE_EXCEL_IMPORT', true),
+    calculator: getEnvBool('NEXT_PUBLIC_ENABLE_CALCULATOR', true),
+    mediaUpload: getEnvBool('NEXT_PUBLIC_ENABLE_MEDIA_UPLOAD', true),
+    excelImport: getEnvBool('NEXT_PUBLIC_ENABLE_EXCEL_IMPORT', true),
   },
   
   limits: {
-    maxFileSize: getEnvNumber('REACT_APP_MAX_FILE_SIZE', 10485760), // 10MB
-    maxImageSize: getEnvNumber('REACT_APP_MAX_IMAGE_SIZE', 5242880), // 5MB
-    maxAudioSize: getEnvNumber('REACT_APP_MAX_AUDIO_SIZE', 10485760), // 10MB
+    maxFileSize: getEnvNumber('NEXT_PUBLIC_MAX_FILE_SIZE', 10485760), // 10MB
+    maxImageSize: getEnvNumber('NEXT_PUBLIC_MAX_IMAGE_SIZE', 5242880), // 5MB
+    maxAudioSize: getEnvNumber('NEXT_PUBLIC_MAX_AUDIO_SIZE', 10485760), // 10MB
   },
   
   settings: {
-    defaultTestTimeLimit: getEnvNumber('REACT_APP_DEFAULT_TEST_TIME_LIMIT', 60),
-    autoSaveInterval: getEnvNumber('REACT_APP_AUTO_SAVE_INTERVAL', 30000), // 30 seconds
+    defaultTestTimeLimit: getEnvNumber('NEXT_PUBLIC_DEFAULT_TEST_TIME_LIMIT', 60),
+    autoSaveInterval: getEnvNumber('NEXT_PUBLIC_AUTO_SAVE_INTERVAL', 30000), // 30 seconds
   },
 };
 

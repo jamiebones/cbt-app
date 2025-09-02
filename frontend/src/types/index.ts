@@ -1,11 +1,20 @@
 import { ReactNode } from 'react';
 
+// Auth context type
+export interface AuthContextType {
+  state: AuthState;
+  login: (credentials: LoginCredentials) => Promise<void>;
+  register: (data: RegisterData) => Promise<void>;
+  logout: () => Promise<void>;
+  refreshAuth: () => Promise<void>;
+}
+
 // User and Authentication Types
 export interface User {
   id: string;
   email: string;
   name: string;
-  role: 'test_center_owner' | 'test_creator' | 'student' | 'admin';
+  role: 'test_center_owner' | 'test_creator' | 'student' | 'admin' | 'super_admin';
   testCenter?: string;
   createdAt: string;
   updatedAt: string;

@@ -57,7 +57,7 @@ const userSchema = new Schema({
         type: String,
         required: [true, 'User role is required'],
         enum: {
-            values: ['test_center_owner', 'test_creator', 'student'],
+            values: ['test_center_owner', 'test_creator', 'student', "super_admin"],
             message: 'Role must be either test_center_owner, test_creator, or student'
         }
     },

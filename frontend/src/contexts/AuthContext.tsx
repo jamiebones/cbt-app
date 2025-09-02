@@ -1,49 +1,53 @@
+"use client";
+
 import React, {
   createContext,
   useContext,
   useReducer,
   useEffect,
   ReactNode,
-} from 'react';
-import { User, AuthState, LoginCredentials, RegisterData } from '../types';
-import { authService, AuthResponse } from '../services/auth';
+} from "react";
+import {
+  User,
+  AuthState,
+  LoginCredentials,
+  RegisterData,
+  AuthContextType,
+} from "../types";
+import { authService, AuthResponse } from "../services/auth";
+import authStorage from "../utils/authStorage";
 
 // Auth action types
 type AuthAction =
-  | { type: 'AUTH_START' }
-  | { type: 'AUTH_SUCCESS'; payload: AuthResponse }
-  | { type: 'AUTH_FAILURE'; payload: string }
-  | { type: 'LOGOUT' }
-  | { type: 'RESTORE_AUTH'; payload: { user: User; token: string } };
+  | { type: "AUTH_START" }
+  | { type: "AUTH_SUCCESS"; payload: AuthResponse }
+  | { type: "AUTH_FAILURE"; payload: string }
+  | { type: "LOGOUT" }
+  | { type: "RESTORE_AUTH"; payload: { user: User; token: string } };
 
-// Auth context type
-interface AuthContextType {
-  state: AuthState;
-  login: (credentials: LoginCredentials) => Promise<void>;
-  register: (data: RegisterData) => Promise<void>;
-  logout: () => Promise<void>;
-  refreshAuth: () => Promise<void>;
-}
-
-// Initial state
-const initialState: AuthState = {
-  user: null,
-  token: null,
-  refreshToken: null,
-  isAuthenticated: false,
-  isLoading: true,
+// Build initial state from localStorage synchronously to survive full page reloads
+const buildInitialState = (): AuthState => {
+  const token = authStorage.getToken();
+  const user = authStorage.getUser();
+  return {
+    user: user || null,
+    token: token || null,
+    refreshToken: authStorage.getRefreshToken() || null,
+    isAuthenticated: !!(user && token),
+    isLoading: false,
+  };
 };
 
 // Auth reducer
 const authReducer = (state: AuthState, action: AuthAction): AuthState => {
   switch (action.type) {
-    case 'AUTH_START':
+    case "AUTH_START":
       return {
         ...state,
         isLoading: true,
       };
 
-    case 'AUTH_SUCCESS':
+    case "AUTH_SUCCESS":
       return {
         ...state,
         user: action.payload.user,
@@ -53,7 +57,7 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
         isLoading: false,
       };
 
-    case 'AUTH_FAILURE':
+    case "AUTH_FAILURE":
       return {
         ...state,
         user: null,
@@ -63,7 +67,7 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
         isLoading: false,
       };
 
-    case 'LOGOUT':
+    case "LOGOUT":
       return {
         ...state,
         user: null,
@@ -73,12 +77,12 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
         isLoading: false,
       };
 
-    case 'RESTORE_AUTH':
+    case "RESTORE_AUTH":
       return {
         ...state,
         user: action.payload.user,
         token: action.payload.token,
-        refreshToken: null, // We don't store refresh token in context
+        refreshToken: null, 
         isAuthenticated: true,
         isLoading: false,
       };
@@ -97,28 +101,48 @@ interface AuthProviderProps {
 }
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
-  const [state, dispatch] = useReducer(authReducer, initialState);
-
+  // Initialize reducer with state built from localStorage so token/user survive full page reloads
+  const [state, dispatch] = useReducer(authReducer, buildInitialState());
   // Login function
   const login = async (credentials: LoginCredentials): Promise<void> => {
+    dispatch({ type: "AUTH_START" });
     try {
-      dispatch({ type: 'AUTH_START' });
       const authData = await authService.login(credentials);
-      dispatch({ type: 'AUTH_SUCCESS', payload: authData });
+      authStorage.setToken(authData.token);
+      authStorage.setRefreshToken(authData.refreshToken || null);
+      authStorage.setUser(authData.user || null);
+      dispatch({ type: "AUTH_SUCCESS", payload: authData });
     } catch (error: any) {
-      dispatch({ type: 'AUTH_FAILURE', payload: error.message });
+      if (process.env.NODE_ENV === "production") {
+        // Optionally send to error tracking service
+      } else {
+        console.warn("Login error:", error);
+      }
+      dispatch({
+        type: "AUTH_FAILURE",
+        payload: "Login failed. Please check your credentials.",
+      });
       throw error;
     }
   };
 
   // Register function
   const register = async (data: RegisterData): Promise<void> => {
+    dispatch({ type: "AUTH_START" });
     try {
-      dispatch({ type: 'AUTH_START' });
       const authData = await authService.register(data);
-      dispatch({ type: 'AUTH_SUCCESS', payload: authData });
+      authStorage.setToken(authData.token);
+      authStorage.setRefreshToken(authData.refreshToken || null);
+      authStorage.setUser(authData.user || null);
+      dispatch({ type: "AUTH_SUCCESS", payload: authData });
     } catch (error: any) {
-      dispatch({ type: 'AUTH_FAILURE', payload: error.message });
+      if (process.env.NODE_ENV !== "production") {
+        console.warn("Register error:", error);
+      }
+      dispatch({
+        type: "AUTH_FAILURE",
+        payload: "Registration failed. Please try again.",
+      });
       throw error;
     }
   };
@@ -128,63 +152,106 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       await authService.logout();
     } catch (error) {
-      console.warn('Logout error:', error);
+        console.warn("Logout error:", error);
     } finally {
-      dispatch({ type: 'LOGOUT' });
+      authStorage.clearAuth();
+      dispatch({ type: "LOGOUT" });
+      // Broadcast to other tabs for cross-tab sync
+      try {
+        window.localStorage.setItem("auth:broadcast", String(Date.now()));
+      } catch (e) {}
     }
   };
 
   // Refresh authentication
   const refreshAuth = async (): Promise<void> => {
     try {
-      const user = authService.getCurrentUser();
-      const token = authService.getToken();
-
-      if (user && token) {
-        dispatch({ type: 'RESTORE_AUTH', payload: { user, token } });
+      const currentToken = authStorage.getToken();
+      if (!currentToken) {
+        dispatch({ type: "LOGOUT" });
+        return;
+      }
+      const newToken = await authService.refreshToken();
+      if (typeof newToken === "string" && newToken) {
+        authStorage.setToken(newToken);
+        let user: User | null = null;
+        try {
+          user = await authService.getProfile();
+        } catch (e) {
+          user = null;
+        }
+        if (user) {
+          authStorage.setUser(user);
+          dispatch({
+            type: "RESTORE_AUTH",
+            payload: { user, token: newToken },
+          });
+        } else {
+          dispatch({ type: "LOGOUT" });
+        }
       } else {
-        dispatch({ type: 'LOGOUT' });
+        dispatch({ type: "LOGOUT" });
       }
     } catch (error) {
-      console.warn('Auth refresh error:', error);
-      dispatch({ type: 'LOGOUT' });
+      if (process.env.NODE_ENV !== "production") {
+        console.warn("Auth refresh error:", error);
+      }
+      dispatch({ type: "LOGOUT" });
     }
   };
 
   // Initialize authentication on mount
   useEffect(() => {
+    // On mount, only fetch profile if token exists
     const initializeAuth = async () => {
-      try {
-        if (authService.isAuthenticated()) {
-          // Try to get fresh user data
+      const token = authStorage.getToken();
+      if (token) {
+        try {
           const user = await authService.getProfile();
-          const token = authService.getToken();
-
-          if (user && token) {
-            dispatch({ type: 'RESTORE_AUTH', payload: { user, token } });
+          if (user) {
+            authStorage.setUser(user);
+            dispatch({ type: "RESTORE_AUTH", payload: { user, token } });
           } else {
-            dispatch({ type: 'LOGOUT' });
+            dispatch({ type: "LOGOUT" });
           }
-        } else {
-          dispatch({ type: 'LOGOUT' });
+        } catch (err) {
+          if (process.env.NODE_ENV !== "production") {
+            console.warn("Auth profile fetch error:", err);
+          }
+          dispatch({ type: "LOGOUT" });
         }
-      } catch (error) {
-        console.warn('Auth initialization error:', error);
-        dispatch({ type: 'LOGOUT' });
+      } else {
+        dispatch({ type: "LOGOUT" });
       }
     };
-
     initializeAuth();
   }, []);
 
   // Listen for logout events from API service
   useEffect(() => {
     const handleLogout = () => {
-      dispatch({ type: 'LOGOUT' });
+      authStorage.clearAuth();
+      dispatch({ type: "LOGOUT" });
     };
+    window.addEventListener("auth:logout", handleLogout);
+    return () => window.removeEventListener("auth:logout", handleLogout);
+  }, []);
 
-    window.addEventListener('auth:logout', handleLogout);
-    return () => window.removeEventListener('auth:logout', handleLogout);
+  // Cross-tab auth sync: listen to storage events so logout/login actions in one tab
+  useEffect(() => {
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === "auth:broadcast") {
+        const token = authStorage.getToken();
+        const user = authStorage.getUser();
+        if (token && user) {
+          dispatch({ type: "RESTORE_AUTH", payload: { user, token } });
+        } else {
+          dispatch({ type: "LOGOUT" });
+        }
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
   }, []);
 
   const value: AuthContextType = {
@@ -199,12 +266,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 };
 
 // Hook to use auth context
-export const useAuth = (): AuthContextType => {
+const useAuth = (): AuthContextType => {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
 };
 
-export default AuthContext;
+export { AuthContext, useAuth };

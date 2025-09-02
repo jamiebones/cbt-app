@@ -15,6 +15,9 @@ import { logger } from './config/logger.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { notFoundHandler } from './middleware/notFoundHandler.js';
 
+import { userService } from './modules/users/service.js'
+import { ensureSuperAdmin } from './utils/ensureSuperAdmin.js';
+
 // Import module routers
 import authRoutes from './modules/auth/routes.js';
 import userRoutes from './modules/users/routes.js';
@@ -139,6 +142,8 @@ const startServer = async () => {
         // Connect to databases
         await connectDatabase();
         await connectRedis();
+        
+        await ensureSuperAdmin(userService);
 
         app.listen(PORT, '0.0.0.0', () => {
             logger.info(`CBT Backend Server running on port ${PORT} in ${NODE_ENV} mode`);

@@ -33,7 +33,6 @@ const createApiInstance = (baseURL: string): AxiosInstance => {
     },
     async (error: AxiosError) => {
       const originalRequest = error.config as any;
-
       if (error.response?.status === 401 && !originalRequest._retry) {
         originalRequest._retry = true;
 

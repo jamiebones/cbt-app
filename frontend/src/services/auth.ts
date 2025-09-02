@@ -115,7 +115,7 @@ class AuthService {
   getCurrentUser(): User | null {
     const userData = localStorage.getItem(APP_CONSTANTS.STORAGE_KEYS.USER_DATA);
     if (!userData) return null;
-    
+
     try {
       return JSON.parse(userData);
     } catch {
