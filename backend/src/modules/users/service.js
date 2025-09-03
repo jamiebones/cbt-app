@@ -1,6 +1,6 @@
 import { User } from '../../models/index.js';
 import { logger } from '../../config/logger.js';
-import test from 'node:test';
+
 
 class UserService {
     async createTestCenterOwner(data) {
@@ -36,10 +36,49 @@ class UserService {
             },
         };
 
-   
+
         const newUser = new User(userData);
         await newUser.save();
         logger.info(`Test center owner created: ${newUser.email}`);
+        return newUser;
+    }
+
+    async createTestCreator(data, testCenterOwnerId) {
+        logger.info('Creating test creator', { email: data.email, testCenterOwnerId });
+
+        // Validate required fields
+        const requiredFields = ['email', 'password', 'firstName', 'lastName'];
+        for (const field of requiredFields) {
+            if (!data[field]) {
+                throw new Error(`Missing required field: ${field}`);
+            }
+        }
+
+        // Check if user already exists
+        const existing = await User.findOne({ email: data.email });
+        if (existing) {
+            throw new Error('A user with this email already exists');
+        }
+        // Verify that the test center owner exists and has the correct role
+        const testCenterOwner = await User.findById(testCenterOwnerId);
+        if (!testCenterOwner || testCenterOwner.role !== 'test_center_owner') {
+            throw new Error('Invalid test center owner');
+        }
+
+        // Create new test creator
+        const userData = {
+            email: data.email,
+            password: data.password, // Will be hashed by model middleware
+            firstName: data.firstName,
+            lastName: data.lastName,
+            phoneNumber: data.phoneNumber || null,
+            role: 'test_creator',
+            testCenterOwner: testCenterOwnerId,
+        };
+
+        const newUser = new User(userData);
+        await newUser.save();
+        logger.info(`Test creator created: ${newUser.email} for test center owner: ${testCenterOwnerId}`);
         return newUser;
     }
     async findById(id) {

@@ -4,10 +4,48 @@ import userService from './service.js';
 class UserController {
     getUsers = async (req, res) => {
         logger.info('Get users endpoint called');
-        res.status(501).json({
-            success: false,
-            message: 'Get users not implemented yet'
-        });
+
+        try {
+            // Check if user is super_admin
+            if (req.user.role !== 'super_admin') {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Access denied. Super admin privileges required.'
+                });
+            }
+
+            const { page = 1, limit = 10, role } = req.query;
+
+            let filter = {};
+            if (role) {
+                filter.role = role;
+            }
+
+            const result = await userService.listUsers(filter, { page: parseInt(page), limit: parseInt(limit) });
+
+            res.json({
+                success: true,
+                data: result.users.map(user => ({
+                    id: user.id,
+                    email: user.email,
+                    firstName: user.firstName,
+                    lastName: user.lastName,
+                    role: user.role,
+                    phoneNumber: user.phoneNumber,
+                    testCenterName: user.testCenterName,
+                    isActive: user.isActive,
+                    createdAt: user.createdAt,
+                    updatedAt: user.updatedAt
+                })),
+                pagination: result.pagination
+            });
+        } catch (error) {
+            logger.error('Get users failed:', error);
+            res.status(500).json({
+                success: false,
+                message: error.message || 'Failed to get users'
+            });
+        }
     };
 
     getUserById = async (req, res) => {
@@ -52,10 +90,76 @@ class UserController {
 
     createTestCreator = async (req, res) => {
         logger.info('Create test creator endpoint called');
-        res.status(501).json({
-            success: false,
-            message: 'Create test creator not implemented yet'
-        });
+
+        try {
+            const testCenterOwnerId = req.user.id;
+            // Verify the user is a test center owner
+            if (req.user.role !== 'test_center_owner') {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Only test center owners can create test creators'
+                });
+            }
+            const testCreatorData = req.body;
+            const newTestCreator = await userService.createTestCreator(testCreatorData, testCenterOwnerId);
+            res.status(201).json({
+                success: true,
+                message: 'Test creator created successfully',
+                data: {
+                    id: newTestCreator.id,
+                    email: newTestCreator.email,
+                    firstName: newTestCreator.firstName,
+                    lastName: newTestCreator.lastName,
+                    role: newTestCreator.role,
+                    createdAt: newTestCreator.createdAt
+                }
+            });
+        } catch (error) {
+            logger.error('Create test creator failed:', error);
+            res.status(400).json({
+                success: false,
+                message: error.message || 'Failed to create test creator'
+            });
+        }
+    };
+
+    createTestCenterOwner = async (req, res) => {
+        logger.info('Create test center owner endpoint called');
+
+        try {
+            // Verify the user is a super_admin
+            if (req.user.role !== 'super_admin') {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Only super admins can create test center owners'
+                });
+            }
+
+            const testCenterOwnerData = req.body;
+            const newTestCenterOwner = await userService.createTestCenterOwner(testCenterOwnerData);
+
+            res.status(201).json({
+                success: true,
+                message: 'Test center owner created successfully',
+                data: {
+                    id: newTestCenterOwner.id,
+                    email: newTestCenterOwner.email,
+                    firstName: newTestCenterOwner.firstName,
+                    lastName: newTestCenterOwner.lastName,
+                    phoneNumber: newTestCenterOwner.phoneNumber,
+                    testCenterName: newTestCenterOwner.testCenterName,
+                    testCenterAddress: newTestCenterOwner.testCenterAddress,
+                    role: newTestCenterOwner.role,
+                    createdAt: newTestCenterOwner.createdAt
+                }
+            });
+        } catch (error) {
+            logger.error('Create test center owner failed:', error);
+            res.status(400).json({
+                success: false,
+                message: error.message || 'Failed to create test center owner'
+            });
+        }
     };
 
     registerStudent = async (req, res) => {
@@ -66,13 +170,43 @@ class UserController {
         });
     };
 
-    createTestCenterOwner = async (req, res) => {
-        logger.info('Create test center owner endpoint called');
-        await userService.createTestCenterOwner(req.body);
-        res.status(201).json({
-            success: true,
-            message: 'Test center owner created successfully'
-        });
+    getTestCenterOwners = async (req, res) => {
+        logger.info('Get test center owners endpoint called');
+
+        try {
+            // Check if user is super_admin
+            if (req.user.role !== 'super_admin') {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Access denied. Super admin privileges required.'
+                });
+            }
+
+            const testCenterOwners = await userService.findTestCenterOwners();
+
+            res.json({
+                success: true,
+                data: testCenterOwners.map(owner => ({
+                    id: owner.id,
+                    email: owner.email,
+                    firstName: owner.firstName,
+                    lastName: owner.lastName,
+                    phoneNumber: owner.phoneNumber,
+                    testCenterName: owner.testCenterName,
+                    testCenterAddress: owner.testCenterAddress,
+                    subscriptionTier: owner.subscriptionTier,
+                    isActive: owner.isActive,
+                    createdAt: owner.createdAt,
+                    updatedAt: owner.updatedAt
+                }))
+            });
+        } catch (error) {
+            logger.error('Get test center owners failed:', error);
+            res.status(500).json({
+                success: false,
+                message: error.message || 'Failed to get test center owners'
+            });
+        }
     };
 }
 

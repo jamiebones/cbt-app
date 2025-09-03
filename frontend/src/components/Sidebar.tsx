@@ -5,7 +5,14 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AuthContext } from "@/contexts/AuthContext";
 import { User } from "@/types";
-import { Home, BarChart2, FileText, Users, Settings } from "lucide-react";
+import {
+  Home,
+  BarChart2,
+  FileText,
+  Users,
+  Settings,
+  UserPlus,
+} from "lucide-react";
 
 const Sidebar: React.FC = () => {
   const authContext = useContext(AuthContext);
@@ -27,6 +34,11 @@ const Sidebar: React.FC = () => {
       case "test_center_owner":
         return [
           ...baseLinks,
+          {
+            href: "/test-creators",
+            icon: <UserPlus className="h-5 w-5" />,
+            label: "Create Test Creator",
+          },
           {
             href: "/tests",
             icon: <FileText className="h-5 w-5" />,
@@ -69,6 +81,25 @@ const Sidebar: React.FC = () => {
             href: "/my-results",
             icon: <BarChart2 className="h-5 w-5" />,
             label: "My Results",
+          },
+        ];
+      case "super_admin":
+        return [
+          ...baseLinks,
+          {
+            href: "/admin/test-centers",
+            icon: <Users className="h-5 w-5" />,
+            label: "Test Centers",
+          },
+          {
+            href: "/admin/analytics",
+            icon: <BarChart2 className="h-5 w-5" />,
+            label: "System Analytics",
+          },
+          {
+            href: "/admin/settings",
+            icon: <Settings className="h-5 w-5" />,
+            label: "System Settings",
           },
         ];
       default:
