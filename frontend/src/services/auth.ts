@@ -67,9 +67,9 @@ class AuthService {
   }
 
   // Get current user profile
-  async getProfile(): Promise<User> {
+  async getProfile(): Promise<{ user: User }> {
     try {
-      const response = await mainApi.get<ApiResponse<User>>(API_ENDPOINTS.PROFILE);
+      const response = await mainApi.get<ApiResponse<{ user: User }>>(API_ENDPOINTS.PROFILE);
       return handleApiResponse(response);
     } catch (error: any) {
       throw new Error(handleApiError(error));

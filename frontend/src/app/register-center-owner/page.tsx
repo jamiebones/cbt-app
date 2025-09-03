@@ -34,7 +34,7 @@ export default function RegisterCenterOwnerPage() {
 
   // Only super-admins can access
 
-  if (state.user?.role !== "super_admin") {
+  if (state.user?.user?.role !== "super_admin") {
     return (
       <Card className="max-w-xl mx-auto mt-12 p-8">
         <div className="text-xl font-bold text-red-600 mb-2">Access Denied</div>

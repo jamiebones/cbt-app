@@ -62,6 +62,8 @@ export const API_ENDPOINTS = {
   STUDENTS: '/api/users/students',
   TEST_CENTER_OWNERS: '/api/users/test-center-owners',
   TEST_CENTER_OWNER_CREATORS: '/api/users/center/create-test-creators',
+  GET_TEST_CREATORS_BY_OWNER: '/api/users/center/test-creators',
+  DELETE_TEST_CREATOR: (id: string) => `/api/users/center/test-creators/${id}`,
 
   // Tests
   TESTS: '/api/tests',

@@ -17,6 +17,8 @@ router.get('/', userController.getUsers);
 // Test center specific routes
 // router.get('/center/:centerId', userController.getUsersByCenter); // Not implemented
 router.post('/center/create-test-creators', userController.createTestCreator);
+router.get('/center/test-creators', userController.getTestCreatorsByOwner);
+router.delete('/center/test-creators/:testCreatorId', userController.deleteTestCreator);
 // router.post('/center/:centerId/students', userController.registerStudent); // Not implemented
 router.post('/center/create-test-center-owners', userController.createTestCenterOwner);
 

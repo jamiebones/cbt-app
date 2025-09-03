@@ -32,9 +32,9 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }
 
   // If a specific role is required and user does not have it, redirect accordingly
-  if (requiredRole && state.user?.role !== requiredRole) {
+  if (requiredRole && state.user?.user?.role !== requiredRole) {
     if (typeof window !== "undefined") {
-      switch (state.user?.role) {
+      switch (state.user?.user?.role) {
         case "super_admin":
           router.replace("/admin");
           break;

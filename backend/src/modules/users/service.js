@@ -220,12 +220,43 @@ class UserService {
         }
     }
 
-    async getUserCount(filters = {}) {
-        logger.debug('Getting user count with filters:', filters);
+    async findTestCreatorsByOwner(ownerId) {
+        logger.debug(`Finding test creators by owner: ${ownerId}`);
         try {
-            return await User.countDocuments(filters);
+            return await User.find({
+                role: 'test_creator',
+                testCenterOwner: ownerId
+            }).sort({ createdAt: -1 });
         } catch (error) {
-            logger.error('Error getting user count:', error.message);
+            logger.error('Error finding test creators by owner:', error.message);
+            throw error;
+        }
+    }
+
+    async deleteTestCreator(testCreatorId, ownerId) {
+        logger.info(`Deleting test creator: ${testCreatorId} by owner: ${ownerId}`);
+        try {
+            // First, verify the test creator exists and belongs to the owner
+            const testCreator = await User.findById(testCreatorId);
+            if (!testCreator) {
+                throw new Error('Test creator not found');
+            }
+
+            if (testCreator.role !== 'test_creator') {
+                throw new Error('User is not a test creator');
+            }
+
+            if (testCreator.testCenterOwner.toString() !== ownerId) {
+                throw new Error('Unauthorized: Test creator does not belong to this test center owner');
+            }
+
+            // Delete the test creator
+            await User.findByIdAndDelete(testCreatorId);
+            logger.info(`Test creator deleted successfully: ${testCreatorId}`);
+
+            return { success: true, message: 'Test creator deleted successfully' };
+        } catch (error) {
+            logger.error('Error deleting test creator:', error.message);
             throw error;
         }
     }

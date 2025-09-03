@@ -208,6 +208,75 @@ class UserController {
             });
         }
     };
+
+    getTestCreatorsByOwner = async (req, res) => {
+        logger.info('Get test creators by owner endpoint called');
+
+        try {
+            const testCenterOwnerId = req.user.id;
+
+            // Verify the user is a test center owner
+            if (req.user.role !== 'test_center_owner') {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Only test center owners can view test creators'
+                });
+            }
+
+            const testCreators = await userService.findTestCreatorsByOwner(testCenterOwnerId);
+
+            res.json({
+                success: true,
+                data: testCreators.map(creator => ({
+                    id: creator.id,
+                    email: creator.email,
+                    firstName: creator.firstName,
+                    lastName: creator.lastName,
+                    phoneNumber: creator.phoneNumber,
+                    role: creator.role,
+                    isActive: creator.isActive,
+                    createdAt: creator.createdAt,
+                    updatedAt: creator.updatedAt
+                }))
+            });
+        } catch (error) {
+            logger.error('Get test creators by owner failed:', error);
+            res.status(500).json({
+                success: false,
+                message: error.message || 'Failed to get test creators'
+            });
+        }
+    };
+
+    deleteTestCreator = async (req, res) => {
+        logger.info('Delete test creator endpoint called');
+
+        try {
+            const testCenterOwnerId = req.user.id;
+            const { testCreatorId } = req.params;
+
+            // Verify the user is a test center owner
+            if (req.user.role !== 'test_center_owner') {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Only test center owners can delete test creators'
+                });
+            }
+
+            const result = await userService.deleteTestCreator(testCreatorId, testCenterOwnerId);
+
+            res.json({
+                success: true,
+                message: result.message
+            });
+        } catch (error) {
+            logger.error('Delete test creator failed:', error);
+            res.status(400).json({
+                success: false,
+                message: error.message || 'Failed to delete test creator'
+            });
+        }
+    };
 }
 
 const userController = new UserController();

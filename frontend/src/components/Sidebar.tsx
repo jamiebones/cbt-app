@@ -1,10 +1,10 @@
 "use client";
 
-import React, { useContext } from "react";
+import React, { useContext, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AuthContext } from "@/contexts/AuthContext";
-import { User } from "@/types";
+
 import {
   Home,
   BarChart2,
@@ -16,11 +16,25 @@ import {
 
 const Sidebar: React.FC = () => {
   const authContext = useContext(AuthContext);
-  const user: User | null | undefined = authContext?.state.user;
+  const user = authContext?.state.user;
+  const isLoading = authContext?.state.isLoading;
+  const isAuthenticated = authContext?.state.isAuthenticated;
   const pathname = usePathname();
 
+  // Force re-render when auth state changes
+  const [navLinks, setNavLinks] = useState<any[]>([]);
+
   const getNavLinks = () => {
-    if (!user) return [];
+    // Don't show role-based links while loading or if user data is incomplete
+    if (!user || !user.user || !user.user.role || isLoading) {
+      return [
+        {
+          href: "/dashboard",
+          icon: <Home className="h-5 w-5" />,
+          label: "Dashboard",
+        },
+      ];
+    }
 
     const baseLinks = [
       {
@@ -30,10 +44,15 @@ const Sidebar: React.FC = () => {
       },
     ];
 
-    switch (user.role) {
+    switch (user.user.role) {
       case "test_center_owner":
         return [
           ...baseLinks,
+          {
+            href: "/manage-test-creators",
+            icon: <Users className="h-5 w-5" />,
+            label: "Manage Test Creators",
+          },
           {
             href: "/test-creators",
             icon: <UserPlus className="h-5 w-5" />,
@@ -107,9 +126,30 @@ const Sidebar: React.FC = () => {
     }
   };
 
-  const navLinks = getNavLinks();
+  // Update navLinks whenever auth state changes
+  useEffect(() => {
+    const newNavLinks = getNavLinks();
+    setNavLinks(newNavLinks);
+  }, [user, isLoading, isAuthenticated]);
 
-  if (!user) {
+  // Show loading state while authentication is being restored
+  if (isLoading) {
+    return (
+      <aside className="w-64 bg-gray-800 text-white flex flex-col">
+        <div className="p-4 border-b border-gray-700">
+          <h2 className="text-xl font-bold">Navigation</h2>
+        </div>
+        <nav className="flex-grow p-2">
+          <div className="flex items-center justify-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+          </div>
+        </nav>
+      </aside>
+    );
+  }
+
+  // Don't show sidebar if not authenticated and not loading
+  if (!isAuthenticated && !isLoading) {
     return null;
   }
 

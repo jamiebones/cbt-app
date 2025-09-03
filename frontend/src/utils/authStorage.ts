@@ -43,18 +43,27 @@ export const setRefreshToken = (token: string | null | undefined) => {
   }
 };
 
-export const getUser = (): any | null => {
+import { User } from '../types';
+
+export const getUser = (): { user: User } | null => {
   try {
     if (typeof window === "undefined") return null;
     const raw = localStorage.getItem(STORAGE_KEYS.USER_DATA);
-    return raw ? JSON.parse(raw) : null;
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw);
+    // Validate that the parsed data has the nested user structure
+    if (parsed && typeof parsed === 'object' && parsed.user && typeof parsed.user === 'object' && parsed.user.id && parsed.user.email && parsed.user.role) {
+      return parsed as { user: User };
+    }
+    return null;
   } catch (err) {
     console.warn("authStorage.getUser error", err);
     return null;
   }
 };
 
-export const setUser = (user: any | null) => {
+export const setUser = (user: { user: User } | null) => {
   try {
     if (typeof window === "undefined") return;
     if (user === null) localStorage.removeItem(STORAGE_KEYS.USER_DATA);

@@ -527,9 +527,26 @@ class AuthService {
         }
     }
 
-    // Utility methods
-    generatePasswordResetToken() {
-        return crypto.randomBytes(32).toString('hex');
+    // Get current user profile
+    async getCurrentUser(userId) {
+        logger.info('Getting current user profile', { userId });
+
+        try {
+            const user = await User.findById(userId);
+            if (!user) {
+                throw new Error('User not found');
+            }
+
+            if (!user.isActive) {
+                throw new Error('User account is deactivated');
+            }
+
+            logger.info('Current user profile retrieved successfully', { userId });
+            return user;
+        } catch (error) {
+            logger.error('Get current user failed:', error.message);
+            throw error;
+        }
     }
 
     // Permission checking

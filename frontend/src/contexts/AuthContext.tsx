@@ -23,7 +23,7 @@ type AuthAction =
   | { type: "AUTH_SUCCESS"; payload: AuthResponse }
   | { type: "AUTH_FAILURE"; payload: string }
   | { type: "LOGOUT" }
-  | { type: "RESTORE_AUTH"; payload: { user: User; token: string } };
+  | { type: "RESTORE_AUTH"; payload: { user: { user: User }; token: string } };
 
 // Build initial state from localStorage synchronously to survive full page reloads
 const buildInitialState = (): AuthState => {
@@ -50,7 +50,7 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
     case "AUTH_SUCCESS":
       return {
         ...state,
-        user: action.payload.user,
+        user: { user: action.payload.user },
         token: action.payload.token,
         refreshToken: action.payload.refreshToken,
         isAuthenticated: true,
@@ -110,7 +110,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const authData = await authService.login(credentials);
       authStorage.setToken(authData.token);
       authStorage.setRefreshToken(authData.refreshToken || null);
-      authStorage.setUser(authData.user || null);
+      authStorage.setUser(authData.user ? { user: authData.user } : null);
       dispatch({ type: "AUTH_SUCCESS", payload: authData });
     } catch (error: any) {
       if (process.env.NODE_ENV === "production") {
@@ -133,7 +133,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const authData = await authService.register(data);
       authStorage.setToken(authData.token);
       authStorage.setRefreshToken(authData.refreshToken || null);
-      authStorage.setUser(authData.user || null);
+      authStorage.setUser(authData.user ? { user: authData.user } : null);
       dispatch({ type: "AUTH_SUCCESS", payload: authData });
     } catch (error: any) {
       if (process.env.NODE_ENV !== "production") {
@@ -174,7 +174,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const newToken = await authService.refreshToken();
       if (typeof newToken === "string" && newToken) {
         authStorage.setToken(newToken);
-        let user: User | null = null;
+        let user: { user: User } | null = null;
         try {
           user = await authService.getProfile();
         } catch (e) {

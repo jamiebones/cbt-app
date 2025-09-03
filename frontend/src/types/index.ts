@@ -14,14 +14,14 @@ export interface User {
   id: string;
   email: string;
   name: string;
-  role: 'test_center_owner' | 'test_creator' | 'student' | 'admin' | 'super_admin';
+  role: 'test_center_owner' | 'test_creator' | 'student' | 'super_admin';
   testCenter?: string;
   createdAt: string;
   updatedAt: string;
 }
 
 export interface AuthState {
-  user: User | null;
+  user: { user: User } | null;
   token: string | null;
   refreshToken: string | null;
   isAuthenticated: boolean;

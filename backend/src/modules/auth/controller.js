@@ -189,8 +189,11 @@ class AuthController {
     getCurrentUser = async (req, res) => {
         try {
             this.logger.info('Auth get current user endpoint called');
-            // req.user is set by auth middleware
-            const user = req.user;
+            // req.user contains the JWT payload with user ID
+            const userId = req.user.id;
+
+            // Use service to get current user (business logic)
+            const user = await this.authService.getCurrentUser(userId);
 
             res.json({
                 success: true,
