@@ -1,5 +1,6 @@
 import { User } from '../../models/index.js';
 import { logger } from '../../config/logger.js';
+import { USER_ROLES } from '../../utils/constants.js';
 
 
 class UserService {
@@ -27,7 +28,7 @@ class UserService {
             lastName: data.lastName,
             phoneNumber: data.phoneNumber,
             testCenterName: data.testCenterName,
-            role: 'test_center_owner',
+            role: USER_ROLES.TEST_CENTER_OWNER,
             testCenterAddress: {
                 street: data.testCenterAddress.street,
                 city: data.testCenterAddress.city,
@@ -61,7 +62,7 @@ class UserService {
         }
         // Verify that the test center owner exists and has the correct role
         const testCenterOwner = await User.findById(testCenterOwnerId);
-        if (!testCenterOwner || testCenterOwner.role !== 'test_center_owner') {
+        if (!testCenterOwner || testCenterOwner.role !== USER_ROLES.TEST_CENTER_OWNER) {
             throw new Error('Invalid test center owner');
         }
 
@@ -72,7 +73,7 @@ class UserService {
             firstName: data.firstName,
             lastName: data.lastName,
             phoneNumber: data.phoneNumber || null,
-            role: 'test_creator',
+            role: USER_ROLES.TEST_CREATOR,
             testCenterOwner: testCenterOwnerId,
         };
 
@@ -224,7 +225,7 @@ class UserService {
         logger.debug(`Finding test creators by owner: ${ownerId}`);
         try {
             return await User.find({
-                role: 'test_creator',
+                role: USER_ROLES.TEST_CREATOR,
                 testCenterOwner: ownerId
             }).sort({ createdAt: -1 });
         } catch (error) {
@@ -242,7 +243,7 @@ class UserService {
                 throw new Error('Test creator not found');
             }
 
-            if (testCreator.role !== 'test_creator') {
+            if (testCreator.role !== USER_ROLES.TEST_CREATOR) {
                 throw new Error('User is not a test creator');
             }
 

@@ -4,15 +4,8 @@ import React, { useContext, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AuthContext } from "@/contexts/AuthContext";
-
-import {
-  Home,
-  BarChart2,
-  FileText,
-  Users,
-  Settings,
-  UserPlus,
-} from "lucide-react";
+import { Home, Users, UserPlus, BookOpen, FileText, BarChart2, Settings } from "lucide-react";
+import { USER_ROLES } from "@/utils/config";
 
 const Sidebar: React.FC = () => {
   const authContext = useContext(AuthContext);
@@ -45,7 +38,7 @@ const Sidebar: React.FC = () => {
     ];
 
     switch (user.user.role) {
-      case "test_center_owner":
+      case USER_ROLES.TEST_CENTER_OWNER:
         return [
           ...baseLinks,
           {
@@ -57,6 +50,11 @@ const Sidebar: React.FC = () => {
             href: "/test-creators",
             icon: <UserPlus className="h-5 w-5" />,
             label: "Create Test Creator",
+          },
+          {
+            href: "/subjects",
+            icon: <BookOpen className="h-5 w-5" />,
+            label: "Subjects",
           },
           {
             href: "/tests",
@@ -79,9 +77,14 @@ const Sidebar: React.FC = () => {
             label: "Settings",
           },
         ];
-      case "test_creator":
+      case USER_ROLES.TEST_CREATOR:
         return [
           ...baseLinks,
+          {
+            href: "/subjects",
+            icon: <BookOpen className="h-5 w-5" />,
+            label: "Subjects",
+          },
           {
             href: "/tests",
             icon: <FileText className="h-5 w-5" />,
@@ -93,7 +96,7 @@ const Sidebar: React.FC = () => {
             label: "Analytics",
           },
         ];
-      case "student":
+      case USER_ROLES.STUDENT:
         return [
           ...baseLinks,
           {
@@ -102,7 +105,7 @@ const Sidebar: React.FC = () => {
             label: "My Results",
           },
         ];
-      case "super_admin":
+      case USER_ROLES.SUPER_ADMIN:
         return [
           ...baseLinks,
           {

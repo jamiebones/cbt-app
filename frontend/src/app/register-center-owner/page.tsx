@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { API_ENDPOINTS } from "@/utils/config";
+import { USER_ROLES, API_ENDPOINTS } from "@/utils/config";
 
 const initialForm = {
   email: "",
@@ -34,7 +34,7 @@ export default function RegisterCenterOwnerPage() {
 
   // Only super-admins can access
 
-  if (state.user?.user?.role !== "super_admin") {
+  if (state.user?.user?.role !== USER_ROLES.SUPER_ADMIN) {
     return (
       <Card className="max-w-xl mx-auto mt-12 p-8">
         <div className="text-xl font-bold text-red-600 mb-2">Access Denied</div>

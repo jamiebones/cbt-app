@@ -12,13 +12,13 @@ interface MainLayoutProps {
 
 const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   const authContext = useContext(AuthContext);
-  const user: User | null | undefined = authContext?.state.user;
+  const authUser = authContext?.state?.user;
 
   return (
     <div className="flex flex-col h-screen bg-gray-100">
       <Navbar />
       <div className="flex flex-grow overflow-hidden">
-        {user && <Sidebar />}
+        {authUser && <Sidebar />}
         <main className="flex-grow p-6 overflow-y-auto">
           <div className="max-w-7xl mx-auto">{children}</div>
         </main>

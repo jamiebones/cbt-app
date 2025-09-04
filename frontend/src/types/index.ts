@@ -9,12 +9,14 @@ export interface AuthContextType {
   refreshAuth: () => Promise<void>;
 }
 
+import { UserRole } from '../utils/config';
+
 // User and Authentication Types
 export interface User {
   id: string;
   email: string;
   name: string;
-  role: 'test_center_owner' | 'test_creator' | 'student' | 'super_admin';
+  role: UserRole;
   testCenter?: string;
   createdAt: string;
   updatedAt: string;
@@ -176,7 +178,7 @@ export interface PaginatedResponse<T> {
 // Component Props Types
 export interface RouteProtectionProps {
   children: ReactNode;
-  requiredRole?: User['role'];
+  requiredRole?: UserRole;
   requiredAuth?: boolean;
 }
 

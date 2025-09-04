@@ -1,5 +1,6 @@
 import { subjectService } from './service.js';
 import { logger } from '../../config/logger.js';
+import { USER_ROLES } from '../../utils/constants.js';
 
 class SubjectController {
     constructor() {
@@ -9,7 +10,7 @@ class SubjectController {
     // Get all subjects for the authenticated user's test center
     getSubjects = async (req, res) => {
         try {
-            const ownerId = req.user.role === 'test_center_owner'
+            const ownerId = req.user.role === USER_ROLES.TEST_CENTER_OWNER
                 ? req.user._id
                 : req.user.testCenterOwner;
 
@@ -41,7 +42,7 @@ class SubjectController {
     getSubjectById = async (req, res) => {
         try {
             const { id } = req.params;
-            const ownerId = req.user.role === 'test_center_owner'
+            const ownerId = req.user.role === USER_ROLES.TEST_CENTER_OWNER
                 ? req.user._id
                 : req.user.testCenterOwner;
 
@@ -64,7 +65,7 @@ class SubjectController {
     // Create a new subject
     createSubject = async (req, res) => {
         try {
-            const ownerId = req.user.role === 'test_center_owner'
+            const ownerId = req.user.role === USER_ROLES.TEST_CENTER_OWNER
                 ? req.user._id
                 : req.user.testCenterOwner;
 
@@ -93,7 +94,7 @@ class SubjectController {
     updateSubject = async (req, res) => {
         try {
             const { id } = req.params;
-            const ownerId = req.user.role === 'test_center_owner'
+            const ownerId = req.user.role === USER_ROLES.TEST_CENTER_OWNER
                 ? req.user._id
                 : req.user.testCenterOwner;
 
@@ -123,7 +124,7 @@ class SubjectController {
     deleteSubject = async (req, res) => {
         try {
             const { id } = req.params;
-            const ownerId = req.user.role === 'test_center_owner'
+            const ownerId = req.user.role === USER_ROLES.TEST_CENTER_OWNER
                 ? req.user._id
                 : req.user.testCenterOwner;
 
@@ -146,7 +147,7 @@ class SubjectController {
     // Get subject categories
     getCategories = async (req, res) => {
         try {
-            const ownerId = req.user.role === 'test_center_owner'
+            const ownerId = req.user.role === USER_ROLES.TEST_CENTER_OWNER
                 ? req.user._id
                 : req.user.testCenterOwner;
 
@@ -168,7 +169,7 @@ class SubjectController {
     // Update subject order (for drag-and-drop)
     updateSubjectOrder = async (req, res) => {
         try {
-            const ownerId = req.user.role === 'test_center_owner'
+            const ownerId = req.user.role === USER_ROLES.TEST_CENTER_OWNER
                 ? req.user._id
                 : req.user.testCenterOwner;
 
@@ -200,7 +201,7 @@ class SubjectController {
     // Create default subjects for new test centers
     createDefaultSubjects = async (req, res) => {
         try {
-            const ownerId = req.user.role === 'test_center_owner'
+            const ownerId = req.user.role === USER_ROLES.TEST_CENTER_OWNER
                 ? req.user._id
                 : req.user.testCenterOwner;
 
@@ -223,7 +224,7 @@ class SubjectController {
     // Get subject statistics
     getSubjectStatistics = async (req, res) => {
         try {
-            const ownerId = req.user.role === 'test_center_owner'
+            const ownerId = req.user.role === USER_ROLES.TEST_CENTER_OWNER
                 ? req.user._id
                 : req.user.testCenterOwner;
 

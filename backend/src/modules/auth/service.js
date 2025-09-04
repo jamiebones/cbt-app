@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import { User } from '../../models/index.js';
 import { logger } from '../../config/logger.js';
 import { redisService } from '../../services/redisService.js';
+import { USER_ROLES } from '../../utils/constants.js';
 
 class AuthService {
     constructor() {
@@ -183,7 +184,7 @@ class AuthService {
             }
 
             // Check student ID uniqueness for students
-            if (userData.role === 'student' && userData.studentId) {
+            if (userData.role === USER_ROLES.STUDENT && userData.studentId) {
                 const existingStudent = await User.findOne({ studentId: userData.studentId });
                 if (existingStudent) {
                     throw new Error('Student ID already exists');
@@ -509,11 +510,11 @@ class AuthService {
         }
 
         // Role-specific validation
-        if (role === 'test_center_owner' && !userData.testCenterName) {
+        if (role === USER_ROLES.TEST_CENTER_OWNER && !userData.testCenterName) {
             throw new Error('Test center name is required for test center owners');
         }
 
-        if (role === 'student') {
+        if (role === USER_ROLES.STUDENT) {
             if (!userData.studentId) {
                 throw new Error('Student ID is required for students');
             }
@@ -522,7 +523,7 @@ class AuthService {
             }
         }
 
-        if (role === 'test_creator' && !userData.testCenterOwner) {
+        if (role === USER_ROLES.TEST_CREATOR && !userData.testCenterOwner) {
             throw new Error('Test creators must be associated with a test center owner');
         }
     }

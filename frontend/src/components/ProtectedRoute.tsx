@@ -2,6 +2,7 @@
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { User } from "@/types";
+import { USER_ROLES } from "@/utils/config";
 import LoadingSpinner from "./LoadingSpinner";
 
 interface ProtectedRouteProps {
@@ -35,14 +36,14 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   if (requiredRole && state.user?.user?.role !== requiredRole) {
     if (typeof window !== "undefined") {
       switch (state.user?.user?.role) {
-        case "super_admin":
+        case USER_ROLES.SUPER_ADMIN:
           router.replace("/admin");
           break;
-        case "test_center_owner":
-        case "test_creator":
+        case USER_ROLES.TEST_CENTER_OWNER:
+        case USER_ROLES.TEST_CREATOR:
           router.replace("/dashboard");
           break;
-        case "student":
+        case USER_ROLES.STUDENT:
           router.replace("/test-selection");
           break;
         default:

@@ -1,5 +1,6 @@
 import { testSessionService } from './service.js';
 import { logger } from '../../config/logger.js';
+import { USER_ROLES } from '../../utils/constants.js';
 
 class TestSessionController {
     constructor() {
@@ -40,7 +41,7 @@ class TestSessionController {
     getSession = async (req, res) => {
         try {
             const { sessionId } = req.params;
-            const studentId = req.user.role === 'student' ? req.user._id : null;
+            const studentId = req.user.role === USER_ROLES.STUDENT ? req.user._id : null;
 
             const session = await this.testSessionService.getSessionById(sessionId, studentId);
 
@@ -63,7 +64,7 @@ class TestSessionController {
         try {
             const { sessionId, questionId } = req.params;
             const { answer, timeSpent } = req.body;
-            const studentId = req.user.role === 'student' ? req.user._id : null;
+            const studentId = req.user.role === USER_ROLES.STUDENT ? req.user._id : null;
 
             const session = await this.testSessionService.submitAnswer(
                 sessionId,
@@ -96,7 +97,7 @@ class TestSessionController {
     completeSession = async (req, res) => {
         try {
             const { sessionId } = req.params;
-            const studentId = req.user.role === 'student' ? req.user._id : null;
+            const studentId = req.user.role === USER_ROLES.STUDENT ? req.user._id : null;
 
             const session = await this.testSessionService.completeSession(sessionId, studentId);
 
@@ -127,7 +128,7 @@ class TestSessionController {
     abandonSession = async (req, res) => {
         try {
             const { sessionId } = req.params;
-            const studentId = req.user.role === 'student' ? req.user._id : null;
+            const studentId = req.user.role === USER_ROLES.STUDENT ? req.user._id : null;
 
             const session = await this.testSessionService.abandonSession(sessionId, studentId);
 
@@ -153,7 +154,7 @@ class TestSessionController {
     getTestSessions = async (req, res) => {
         try {
             const { testId } = req.params;
-            const ownerId = req.user.role === 'test_center_owner'
+            const ownerId = req.user.role === USER_ROLES.TEST_CENTER_OWNER
                 ? req.user._id
                 : req.user.testCenterOwner;
 
@@ -217,7 +218,7 @@ class TestSessionController {
     getTestAnalytics = async (req, res) => {
         try {
             const { testId } = req.params;
-            const ownerId = req.user.role === 'test_center_owner'
+            const ownerId = req.user.role === USER_ROLES.TEST_CENTER_OWNER
                 ? req.user._id
                 : req.user.testCenterOwner;
 
@@ -242,7 +243,7 @@ class TestSessionController {
         try {
             const { sessionId } = req.params;
             const { reason } = req.body;
-            const ownerId = req.user.role === 'test_center_owner'
+            const ownerId = req.user.role === USER_ROLES.TEST_CENTER_OWNER
                 ? req.user._id
                 : req.user.testCenterOwner;
 
@@ -272,7 +273,7 @@ class TestSessionController {
         try {
             const { sessionId } = req.params;
             const { notes } = req.body;
-            const ownerId = req.user.role === 'test_center_owner'
+            const ownerId = req.user.role === USER_ROLES.TEST_CENTER_OWNER
                 ? req.user._id
                 : req.user.testCenterOwner;
 
@@ -300,7 +301,7 @@ class TestSessionController {
     // Get owner statistics (admin)
     getOwnerStats = async (req, res) => {
         try {
-            const ownerId = req.user.role === 'test_center_owner'
+            const ownerId = req.user.role === USER_ROLES.TEST_CENTER_OWNER
                 ? req.user._id
                 : req.user.testCenterOwner;
 

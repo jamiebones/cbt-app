@@ -1,5 +1,6 @@
 import { logger } from '../../config/logger.js';
 import userService from './service.js';
+import { USER_ROLES } from '../../utils/constants.js';
 
 class UserController {
     getUsers = async (req, res) => {
@@ -7,7 +8,7 @@ class UserController {
 
         try {
             // Check if user is super_admin
-            if (req.user.role !== 'super_admin') {
+            if (req.user.role !== USER_ROLES.SUPER_ADMIN) {
                 return res.status(403).json({
                     success: false,
                     message: 'Access denied. Super admin privileges required.'
@@ -94,7 +95,7 @@ class UserController {
         try {
             const testCenterOwnerId = req.user.id;
             // Verify the user is a test center owner
-            if (req.user.role !== 'test_center_owner') {
+            if (req.user.role !== USER_ROLES.TEST_CENTER_OWNER) {
                 return res.status(403).json({
                     success: false,
                     message: 'Only test center owners can create test creators'
@@ -128,7 +129,7 @@ class UserController {
 
         try {
             // Verify the user is a super_admin
-            if (req.user.role !== 'super_admin') {
+            if (req.user.role !== USER_ROLES.SUPER_ADMIN) {
                 return res.status(403).json({
                     success: false,
                     message: 'Only super admins can create test center owners'
@@ -175,7 +176,7 @@ class UserController {
 
         try {
             // Check if user is super_admin
-            if (req.user.role !== 'super_admin') {
+            if (req.user.role !== USER_ROLES.SUPER_ADMIN) {
                 return res.status(403).json({
                     success: false,
                     message: 'Access denied. Super admin privileges required.'
@@ -216,7 +217,7 @@ class UserController {
             const testCenterOwnerId = req.user.id;
 
             // Verify the user is a test center owner
-            if (req.user.role !== 'test_center_owner') {
+            if (req.user.role !== USER_ROLES.TEST_CENTER_OWNER) {
                 return res.status(403).json({
                     success: false,
                     message: 'Only test center owners can view test creators'
@@ -256,7 +257,7 @@ class UserController {
             const { testCreatorId } = req.params;
 
             // Verify the user is a test center owner
-            if (req.user.role !== 'test_center_owner') {
+            if (req.user.role !== USER_ROLES.TEST_CENTER_OWNER) {
                 return res.status(403).json({
                     success: false,
                     message: 'Only test center owners can delete test creators'

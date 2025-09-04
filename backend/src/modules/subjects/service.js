@@ -1,5 +1,6 @@
 import { Subject, Question, Test, User } from '../../models/index.js';
 import { logger } from '../../config/logger.js';
+import { USER_ROLES } from '../../utils/constants.js';
 
 class SubjectService {
 
@@ -16,9 +17,9 @@ class SubjectService {
 
             // Validate ownership
             let validOwnerRelation = false;
-            if (creator.role === 'test_center_owner') {
+            if (creator.role === USER_ROLES.TEST_CENTER_OWNER) {
                 validOwnerRelation = creator._id.toString() === ownerId.toString();
-            } else if (creator.role === 'test_creator') {
+            } else if (creator.role === USER_ROLES.TEST_CREATOR) {
                 validOwnerRelation = creator.testCenterOwner &&
                     creator.testCenterOwner.toString() === ownerId.toString();
             }

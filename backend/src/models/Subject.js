@@ -18,12 +18,12 @@ const subjectSchema = new Schema({
         trim: true,
         uppercase: true,
         maxlength: [20, 'Subject code cannot exceed 20 characters'],
-        validate: {
-            validator: function (code) {
-                return !code || /^[A-Z0-9_]+$/.test(code);
-            },
-            message: 'Subject code can only contain uppercase letters, numbers, and underscores'
-        }
+        // validate: {
+        //     validator: function (code) {
+        //         return !code || /^[A-Z0-9_]+$/.test(code);
+        //     },
+        //     message: 'Subject code can only contain uppercase letters, numbers, and underscores'
+        // }
     },
 
     description: {
@@ -97,7 +97,7 @@ const subjectSchema = new Schema({
 
 // Compound indexes for performance and uniqueness
 subjectSchema.index({ testCenterOwner: 1, name: 1 }, { unique: true });
-subjectSchema.index({ testCenterOwner: 1, code: 1 }, { unique: true, sparse: true });
+subjectSchema.index({ testCenterOwner: 1, code: 1, isActive: 1 }, { unique: true, sparse: true });
 subjectSchema.index({ createdBy: 1 });
 subjectSchema.index({ category: 1 });
 subjectSchema.index({ isActive: 1 });

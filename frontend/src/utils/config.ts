@@ -135,4 +135,14 @@ export const APP_CONSTANTS = {
   },
 } as const;
 
+// User Roles Constants
+export const USER_ROLES = {
+  SUPER_ADMIN: 'super_admin',
+  TEST_CENTER_OWNER: 'test_center_owner',
+  TEST_CREATOR: 'test_creator',
+  STUDENT: 'student',
+} as const;
+
+export type UserRole = typeof USER_ROLES[keyof typeof USER_ROLES];
+
 export default config;
