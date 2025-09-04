@@ -13,11 +13,7 @@ import { USER_ROLES } from "@/utils/config";
 import { API_ENDPOINTS } from "@/utils/config";
 import LoadingSpinner from "@/components/LoadingSpinner";
 
-interface CreateSubjectForm {
-  name: string;
-  code: string;
-  description: string;
-}
+import { CreateSubjectForm } from "@/types";
 
 const initialForm: CreateSubjectForm = {
   name: "",

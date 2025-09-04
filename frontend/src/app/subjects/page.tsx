@@ -13,23 +13,10 @@ import LoadingSpinner from "@/components/LoadingSpinner";
 import { API_ENDPOINTS } from "@/utils/config";
 import { Search, Plus, Edit, Trash2, BookOpen } from "lucide-react";
 
-interface Subject {
-  _id: string;
-  name: string;
-  code: string;
-  description: string;
-  isActive: boolean;
-  stats: {
-    questionCount: number;
-    testCount: number;
-    averageDifficulty: string;
-  };
-  createdAt: string;
-  updatedAt: string;
-}
+import { SubjectWithStats } from "@/types";
 
 export default function SubjectsPage() {
-  const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [subjects, setSubjects] = useState<SubjectWithStats[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [error, setError] = useState("");
@@ -93,7 +80,8 @@ export default function SubjectsPage() {
     (subject) =>
       subject.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       subject.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      subject.description.toLowerCase().includes(searchTerm.toLowerCase())
+      (subject.description &&
+        subject.description.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   if (loading) {

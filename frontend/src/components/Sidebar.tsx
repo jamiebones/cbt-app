@@ -4,7 +4,15 @@ import React, { useContext, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AuthContext } from "@/contexts/AuthContext";
-import { Home, Users, UserPlus, BookOpen, FileText, BarChart2, Settings } from "lucide-react";
+import {
+  Home,
+  Users,
+  UserPlus,
+  BookOpen,
+  FileText,
+  BarChart2,
+  Settings,
+} from "lucide-react";
 import { USER_ROLES } from "@/utils/config";
 
 const Sidebar: React.FC = () => {
@@ -13,6 +21,12 @@ const Sidebar: React.FC = () => {
   const isLoading = authContext?.state.isLoading;
   const isAuthenticated = authContext?.state.isAuthenticated;
   const pathname = usePathname();
+  const [isClientReady, setIsClientReady] = useState(false);
+
+  // Ensure client-side hydration is complete before showing auth-dependent content
+  useEffect(() => {
+    setIsClientReady(true);
+  }, []);
 
   // Force re-render when auth state changes
   const [navLinks, setNavLinks] = useState<any[]>([]);
@@ -135,8 +149,8 @@ const Sidebar: React.FC = () => {
     setNavLinks(newNavLinks);
   }, [user, isLoading, isAuthenticated]);
 
-  // Show loading state while authentication is being restored
-  if (isLoading) {
+  // Show loading state during initial hydration or when auth is loading
+  if (!isClientReady || isLoading) {
     return (
       <aside className="w-64 bg-gray-800 text-white flex flex-col">
         <div className="p-4 border-b border-gray-700">
@@ -153,7 +167,18 @@ const Sidebar: React.FC = () => {
 
   // Don't show sidebar if not authenticated and not loading
   if (!isAuthenticated && !isLoading) {
-    return null;
+    return (
+      <aside className="w-64 bg-gray-800 text-white flex flex-col opacity-0 pointer-events-none">
+        <div className="p-4 border-b border-gray-700">
+          <h2 className="text-xl font-bold">Navigation</h2>
+        </div>
+        <nav className="flex-grow p-2">
+          <div className="flex items-center justify-center py-8">
+            <div className="text-gray-400 text-sm">Not authenticated</div>
+          </div>
+        </nav>
+      </aside>
+    );
   }
 
   return (

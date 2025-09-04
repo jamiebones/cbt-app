@@ -18,14 +18,7 @@ import { mainApi } from "@/services/api";
 import { API_ENDPOINTS } from "@/utils/config";
 import ProtectedRoute from "@/components/ProtectedRoute";
 
-interface TestCreatorFormData {
-  email: string;
-  password: string;
-  confirmPassword: string;
-  firstName: string;
-  lastName: string;
-  phoneNumber: string;
-}
+import { TestCreatorFormData } from "@/types";
 
 const CreateTestCreatorPage: React.FC = () => {
   const router = useRouter();

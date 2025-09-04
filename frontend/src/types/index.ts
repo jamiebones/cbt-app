@@ -63,15 +63,66 @@ export interface Answer {
 }
 
 export interface Test {
-  id: string;
+  id?: string;
+  _id?: string;
   title: string;
-  description: string;
-  timeLimit: number; // in minutes
-  questions: Question[];
-  settings: TestSettings;
+  description?: string;
+  instructions?: string;
+  duration: number; // in minutes
+  totalQuestions: number;
+  passingScore: number;
+  questionSelectionMethod: 'manual' | 'auto' | 'mixed';
+  testTakers?: string[];
+  autoSelectionConfig?: {
+    questionCount: number;
+    difficultyDistribution: {
+      easy: number;
+      medium: number;
+      hard: number;
+    };
+  };
+  settings: {
+    shuffleQuestions: boolean;
+    shuffleAnswers: boolean;
+    showResultsImmediately: boolean;
+    allowReview: boolean;
+    allowCalculator: boolean;
+    showQuestionNavigation: boolean;
+    preventCopyPaste: boolean;
+    fullScreenMode: boolean;
+  };
+  schedule: {
+    startDate: string;
+    endDate: string;
+  };
+  status: 'draft' | 'published' | 'active' | 'completed' | 'archived';
+  accessCode?: string;
+  testCenterOwner: string;
   createdBy: string;
-  testCenter: string;
-  isActive: boolean;
+  subject: string | Subject;
+  questions?: string[];
+  enrollmentConfig: {
+    isEnrollmentRequired: boolean;
+    enrollmentFee: number;
+    enrollmentDeadline?: string;
+    allowLateEnrollment: boolean;
+    requirePayment: boolean;
+    autoApprove: boolean;
+  };
+  stats: {
+    totalAttempts: number;
+    completedAttempts: number;
+    averageScore: number;
+    highestScore: number;
+    lowestScore: number;
+  };
+  enrollmentStats: {
+    totalEnrolled: number;
+    paidEnrollments: number;
+    pendingPayments: number;
+    totalRevenue: number;
+  };
+  lastModified: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -124,12 +175,16 @@ export interface MediaFile {
 
 // Subject and Question Bank Types
 export interface Subject {
-  id: string;
+  _id: string;
+  id?: string;
   name: string;
-  description: string;
-  questionCount: number;
-  testCenter: string;
+  code: string;
+  description?: string;
+  questionCount?: number;
+  testCenter?: string;
+  isActive?: boolean;
   createdAt: string;
+  updatedAt: string;
 }
 
 // Subscription Types
@@ -202,6 +257,68 @@ export interface ValidationRule {
   maxLength?: number;
   pattern?: RegExp;
   custom?: (value: any) => string | null;
+}
+
+export interface CreateTestFormData {
+  title: string;
+  description: string;
+  instructions: string;
+  duration: number;
+  totalQuestions: number;
+  passingScore: number;
+  questionSelectionMethod: "manual" | "auto" | "mixed";
+  subject: string;
+  schedule: {
+    startDate: string;
+    endDate: string;
+  };
+  settings: {
+    shuffleQuestions: boolean;
+    shuffleAnswers: boolean;
+    showResultsImmediately: boolean;
+    allowReview: boolean;
+    allowCalculator: boolean;
+    showQuestionNavigation: boolean;
+    preventCopyPaste: boolean;
+    fullScreenMode: boolean;
+  };
+  enrollmentConfig: {
+    isEnrollmentRequired: boolean;
+    enrollmentFee: number;
+    enrollmentDeadline?: string;
+    allowLateEnrollment: boolean;
+  };
+  autoSelectionConfig?: {
+    questionCount: number;
+    difficultyDistribution: {
+      easy: number;
+      medium: number;
+      hard: number;
+    };
+  };
+}
+
+export interface TestCreatorFormData {
+  email: string;
+  password: string;
+  confirmPassword: string;
+  firstName: string;
+  lastName: string;
+  phoneNumber: string;
+}
+
+export interface CreateSubjectForm {
+  name: string;
+  code: string;
+  description: string;
+}
+
+export interface SubjectWithStats extends Subject {
+  stats: {
+    questionCount: number;
+    testCount: number;
+    averageDifficulty: string;
+  };
 }
 
 // Environment Configuration
