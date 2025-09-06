@@ -182,10 +182,6 @@ const TestViewPage = () => {
                 Edit Test
               </Button>
             </Link>
-            <Button>
-              <Play className="h-4 w-4 mr-2" />
-              Start Test
-            </Button>
           </div>
         </div>
 
@@ -507,10 +503,6 @@ const TestViewPage = () => {
                     Edit Test
                   </Button>
                 </Link>
-                <Button className="w-full">
-                  <Play className="h-4 w-4 mr-2" />
-                  Start Test
-                </Button>
                 <Button variant="outline" className="w-full">
                   <BarChart3 className="h-4 w-4 mr-2" />
                   View Results
