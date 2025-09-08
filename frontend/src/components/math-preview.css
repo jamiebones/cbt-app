@@ -1,0 +1,60 @@
+/* Styling for the LaTeX preview panel */
+.math-preview-panel {
+  margin-top: 20px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background-color: #f8fafc;
+  padding: 12px;
+  max-height: 300px;
+  overflow-y: auto;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+.math-preview-header {
+  font-weight: 600;
+  font-size: 14px;
+  color: #475569;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.math-preview-item {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px dashed #e2e8f0;
+}
+
+.math-preview-item:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+  padding-bottom: 0;
+}
+
+.math-expression-source {
+  font-family: monospace;
+  background-color: #edf2f7;
+  padding: 8px 12px;
+  border-radius: 4px;
+  color: #2d3748;
+  margin-bottom: 8px;
+  font-size: 13px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.math-expression-render {
+  display: flex;
+  justify-content: center;
+  background-color: white;
+  padding: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+}
+
+/* Ensure KaTeX renders at a good size in the preview */
+.math-expression-render .katex {
+  font-size: 1.2em;
+}

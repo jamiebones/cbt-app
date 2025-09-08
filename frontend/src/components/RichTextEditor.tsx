@@ -2,7 +2,6 @@
 
 import React from "react";
 import dynamic from "next/dynamic";
-import LatexGuide from "./LatexGuide";
 import styles from "./RichTextEditor.module.css";
 
 // Dynamically import the actual editor component with SSR disabled
@@ -15,10 +14,9 @@ const RichTextEditorClient = dynamic(() => import("./RichTextEditorClient"), {
           <span className="text-sm text-gray-600">
             Rich Text Editor with Math Support
           </span>
-          <LatexGuide />
         </div>
         <span className="text-xs text-gray-500">
-          Math support available via LaTeX guide
+          Math equations supported with KaTeX (Ctrl+M)
         </span>
       </div>
       <div className="border rounded-md p-4 bg-gray-50">

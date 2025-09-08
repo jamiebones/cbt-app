@@ -1,5 +1,4 @@
 "use client";
-
 import React, { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -58,6 +57,10 @@ import { Subject, Question, QuestionFormData } from "@/types";
 import { subjectService } from "@/services/subject";
 import { questionService } from "@/services/question";
 import { RichTextEditor } from "@/components/RichTextEditor";
+import MathDisplay from "@/components/MathDisplay";
+import TruncatedQuestion from "@/components/TruncatedQuestion";
+import QuestionPreview from "@/components/QuestionPreview";
+import "katex/dist/katex.min.css";
 
 const SubjectQuestionsPage = () => {
   const params = useParams();
@@ -71,6 +74,10 @@ const SubjectQuestionsPage = () => {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
   const [selectedQuestions, setSelectedQuestions] = useState<string[]>([]);
+  const [previewQuestion, setPreviewQuestion] = useState<Question | null>(null);
+  const [deleteConfirmationId, setDeleteConfirmationId] = useState<
+    string | null
+  >(null);
 
   const subjectId = params.id as string;
 
@@ -197,6 +204,7 @@ const SubjectQuestionsPage = () => {
   const handleDeleteQuestion = async (questionId: string) => {
     try {
       await questionService.deleteQuestion(questionId);
+      setDeleteConfirmationId(null);
       fetchSubjectAndQuestions();
     } catch (err: any) {
       setError(err.message || "Failed to delete question");
@@ -604,9 +612,12 @@ const SubjectQuestionsPage = () => {
                             : question.type}
                         </Badge>
                       </div>
-                      <h3 className="text-lg font-medium text-gray-900 mb-2">
-                        {question.text}
-                      </h3>
+                      <div className="text-lg font-medium text-gray-900 mb-2">
+                        <TruncatedQuestion
+                          content={question.questionText || question.text || ""}
+                          maxLength={200}
+                        />
+                      </div>
                       <div className="text-sm text-gray-600">
                         <p>{question.answers?.length || 0} answers</p>
                       </div>
@@ -620,19 +631,53 @@ const SubjectQuestionsPage = () => {
                         <Edit className="h-4 w-4 mr-2" />
                         Edit
                       </Button>
-                      <Button variant="outline" size="sm">
-                        <Eye className="h-4 w-4 mr-2" />
-                        Preview
-                      </Button>
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => handleDeleteQuestion(question.id)}
-                        className="text-red-600 hover:text-red-700"
+                        onClick={() => setPreviewQuestion(question)}
                       >
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Delete
+                        <Eye className="h-4 w-4 mr-2" />
+                        Preview
                       </Button>
+                      <AlertDialog
+                        open={deleteConfirmationId === question.id}
+                        onOpenChange={(open) => {
+                          if (!open) setDeleteConfirmationId(null);
+                        }}
+                      >
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setDeleteConfirmationId(question.id)}
+                            className="text-red-600 hover:text-red-700"
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Delete
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Question</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Are you sure you want to delete this question?
+                              This action cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel
+                              onClick={() => setDeleteConfirmationId(null)}
+                            >
+                              Cancel
+                            </AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => handleDeleteQuestion(question.id)}
+                            >
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </div>
                   </div>
                 </CardContent>
@@ -640,6 +685,13 @@ const SubjectQuestionsPage = () => {
             ))
           )}
         </div>
+
+        {/* Question Preview Dialog */}
+        <QuestionPreview
+          question={previewQuestion}
+          isOpen={previewQuestion !== null}
+          onClose={() => setPreviewQuestion(null)}
+        />
 
         {/* Edit Dialog */}
         {editingQuestion && (

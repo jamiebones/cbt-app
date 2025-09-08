@@ -55,6 +55,8 @@
   },
   "homepage": "https://github.com/your-org/cbt-application#readme",
   "dependencies": {
-    "lucide-react": "^0.542.0"
+    "@types/react-katex": "^3.0.4",
+    "lucide-react": "^0.542.0",
+    "react-katex": "^3.1.0"
   }
 }
