@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { USER_ROLES } from "@/utils/config";
 import LoadingSpinner from "@/components/LoadingSpinner";
 import { API_ENDPOINTS } from "@/utils/config";
-import { Search, Plus, Edit, Trash2, BookOpen } from "lucide-react";
+import { Search, Plus, Edit, Trash2, BookOpen, FileText } from "lucide-react";
 
 import { SubjectWithStats } from "@/types";
 
@@ -168,6 +168,12 @@ export default function SubjectsPage() {
                   </p>
                 </div>
                 <div className="flex gap-2">
+                  <Link href={`/subjects/${subject._id}/questions`}>
+                    <Button variant="outline" size="sm">
+                      <FileText className="h-4 w-4 mr-2" />
+                      Manage Questions
+                    </Button>
+                  </Link>
                   <Button
                     variant="outline"
                     size="sm"

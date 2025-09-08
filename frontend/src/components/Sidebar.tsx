@@ -12,6 +12,7 @@ import {
   FileText,
   BarChart2,
   Settings,
+  HelpCircle,
 } from "lucide-react";
 import { USER_ROLES } from "@/utils/config";
 
@@ -71,6 +72,11 @@ const Sidebar: React.FC = () => {
             label: "Subjects",
           },
           {
+            href: "/questions",
+            icon: <HelpCircle className="h-5 w-5" />,
+            label: "Question Bank",
+          },
+          {
             href: "/tests",
             icon: <FileText className="h-5 w-5" />,
             label: "Tests",
@@ -98,6 +104,11 @@ const Sidebar: React.FC = () => {
             href: "/subjects",
             icon: <BookOpen className="h-5 w-5" />,
             label: "Subjects",
+          },
+          {
+            href: "/questions",
+            icon: <HelpCircle className="h-5 w-5" />,
+            label: "Question Bank",
           },
           {
             href: "/tests",

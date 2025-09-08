@@ -53,5 +53,8 @@
   "bugs": {
     "url": "https://github.com/your-org/cbt-application/issues"
   },
-  "homepage": "https://github.com/your-org/cbt-application#readme"
+  "homepage": "https://github.com/your-org/cbt-application#readme",
+  "dependencies": {
+    "lucide-react": "^0.542.0"
+  }
 }

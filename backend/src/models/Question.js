@@ -44,7 +44,7 @@ const questionSchema = new Schema({
     type: {
         type: String,
         enum: {
-            values: ['multiple_choice', 'true_false', 'short_answer', 'essay', 'fill_blank'],
+            values: ['multiple_choice', 'true_false'],
             message: 'Invalid question type'
         },
         required: [true, 'Question type is required']

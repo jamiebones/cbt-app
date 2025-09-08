@@ -46,11 +46,13 @@ export interface RegisterData {
 // Test and Question Types
 export interface Question {
   id: string;
-  text: string;
-  type: 'single' | 'multiple';
+  questionText: string;
+  text?: string; // For backward compatibility
+  type: 'multiple_choice' | 'true_false';
   answers: Answer[];
   correctAnswers: string[];
-  subject?: string;
+  subject?: string | Subject;
+  difficulty?: 'easy' | 'medium' | 'hard';
   media?: MediaFile[];
   createdAt: string;
   updatedAt: string;
@@ -246,9 +248,74 @@ export interface CalculatorState {
   isVisible: boolean;
 }
 
-// Form Types
-export interface FormErrors {
-  [key: string]: string;
+// Form Data Types
+export interface AnswerFormData {
+  text: string;
+  isCorrect: boolean;
+}
+
+export interface QuestionFormData {
+  text: string;
+  explanation?: string;
+  type: "multiple_choice" | "true_false";
+  answers: AnswerFormData[];
+  subject: string;
+  difficulty: "easy" | "medium" | "hard";
+  points: number;
+  correctAnswer?: string;
+  keywords: string[];
+  media: {
+    image: File | null;
+    audio: File | null;
+    video: File | null;
+  };
+}
+
+// Question Service Types
+export interface CreateQuestionData {
+  questionText: string;
+  text?: string; // For backward compatibility
+  explanation?: string;
+  type: 'multiple_choice' | 'true_false';
+  answers: { id: string; text: string; isCorrect: boolean }[];
+  subject: string;
+  difficulty?: 'easy' | 'medium' | 'hard';
+  points: number;
+  correctAnswer?: string;
+  keywords?: string[];
+  media?: {
+    image: File | null;
+    audio: File | null;
+    video: File | null;
+  };
+}
+
+export interface UpdateQuestionData extends Partial<CreateQuestionData> {
+  id?: string;
+}
+
+// Subject Service Types
+export interface CreateSubjectData {
+  name: string;
+  code: string;
+  description?: string;
+}
+
+export interface SubjectFilters {
+  page?: number;
+  limit?: number;
+  search?: string;
+  sort?: string;
+}
+
+export interface PaginatedSubjectsResponse {
+  subjects: Subject[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    pages: number;
+  };
 }
 
 export interface ValidationRule {
