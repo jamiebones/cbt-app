@@ -45,6 +45,16 @@ const MathTest: React.FC = () => {
       content:
         '<p>The quadratic formula is <span class="math-inline">x = \\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}</span></p>',
     },
+    {
+      name: "Mixed inline content",
+      content:
+        '<p>Here we have normal text, then <span class="math-inline">x^2 + y^2 = z^2</span>, and more normal text after the equation.</p>',
+    },
+    {
+      name: "Math with spaces in LaTeX",
+      content:
+        '<p>Formula with spaces: <span class="math-inline">\\sum_{i=1}^{n} x_i = \\frac{n(n+1)}{2}</span> which is useful.</p>',
+    },
   ];
 
   return (

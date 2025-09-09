@@ -1,235 +1,254 @@
 "use client";
 
-import React, { useEffect, useRef } from "react";
-import katex from "katex";
+import React, { useMemo } from "react";
+import { InlineMath, BlockMath } from "react-katex";
 import "katex/dist/katex.min.css";
-
-// Common LaTeX patterns that should be wrapped in delimiters
-const LATEX_PATTERNS = [
-  /\\sqrt\[.*?\]\{.*?\}/g, // nth root: \sqrt[2]{25}
-  /\\sqrt\{.*?\}/g, // square root: \sqrt{25}
-  /\\frac\{.*?\}\{.*?\}/g, // fraction: \frac{a}{b}
-  /\\[a-zA-Z]+/g, // LaTeX commands: \alpha, \beta, \sum, etc.
-  /\^[^$\s]+/g, // superscript: x^2, x^{n+1}
-  /_[^$\s]+/g, // subscript: x_1, x_{i+1}
-];
-
-// Function to automatically wrap LaTeX expressions with $ delimiters
-function preprocessLatexContent(content: string): string {
-  let processed = content;
-
-  // Handle CKEditor math spans - these contain raw LaTeX without delimiters
-  processed = processed.replace(
-    /<span class="math-inline">(.*?)<\/span>/g,
-    (match, latexContent) => {
-      // Clean up the LaTeX content
-      const cleanLatex = latexContent
-        .replace(/\\\\+/g, "\\") // Handle escaped backslashes
-        .replace(/^\\\(|\\\)$/g, ""); // Remove LaTeX delimiters if present
-
-      console.log(
-        `Converting CKEditor math span: "${latexContent}" → "$${cleanLatex}$"`
-      );
-      return `$${cleanLatex}$`;
-    }
-  );
-
-  // Skip further processing if content already has delimiters after span conversion
-  if (
-    processed.includes("$") ||
-    processed.includes("\\(") ||
-    processed.includes("\\[")
-  ) {
-    return processed;
-  }
-
-  // Check if any LaTeX patterns are found in plain text
-  const hasLatex = LATEX_PATTERNS.some((pattern) => pattern.test(content));
-
-  if (hasLatex) {
-    // Wrap individual LaTeX expressions found in plain text
-    LATEX_PATTERNS.forEach((pattern) => {
-      processed = processed.replace(pattern, (match) => {
-        // Don't wrap if already wrapped
-        if (match.startsWith("$") && match.endsWith("$")) {
-          return match;
-        }
-        console.log(`Auto-wrapping LaTeX pattern: "${match}" → "$${match}$"`);
-        return `$${match}$`;
-      });
-    });
-  }
-
-  return processed;
-}
 
 interface MathDisplayProps {
   content: string;
   className?: string;
+  displayMode?: boolean; // reserved; decisions are made by delimiters within content
+}
+
+// Hoisted, precompiled regexes for performance
+const RE_SPLIT_LATEX = /(\$\$[\s\S]*?\$\$|\$[\s\S]+?\$)/g;
+const RE_BARE_TEX = /(\\[a-zA-Z]+(?:\{[^}]*\})*)/g;
+const RE_NBSP = /\u00A0|\xA0/g;
+
+// Lazily created shared DOM elements (client-only)
+let DECODER_EL: HTMLTextAreaElement | null = null;
+let EXTRACTOR_EL: HTMLDivElement | null = null;
+
+// Decode HTML entities efficiently using a reusable textarea
+function decodeHtmlEntities(text: string): string {
+  if (!text) return "";
+  if (!DECODER_EL && typeof document !== "undefined") {
+    DECODER_EL = document.createElement("textarea");
+  }
+  if (!DECODER_EL) return text; // should not happen on client
+  DECODER_EL.innerHTML = text;
+  return DECODER_EL.value;
+}
+
+// Extract text from HTML while preserving CKEditor math spans as $...$
+function extractTextFromHtml(html: string): string {
+  if (!EXTRACTOR_EL && typeof document !== "undefined") {
+    EXTRACTOR_EL = document.createElement("div");
+  }
+  if (!EXTRACTOR_EL) return html;
+  EXTRACTOR_EL.innerHTML = html;
+
+  const BLOCK_TAGS = new Set([
+    "P",
+    "DIV",
+    "LI",
+    "UL",
+    "OL",
+    "SECTION",
+    "ARTICLE",
+    "ASIDE",
+    "HEADER",
+    "FOOTER",
+    "NAV",
+    "H1",
+    "H2",
+    "H3",
+    "H4",
+    "H5",
+    "H6",
+    "TABLE",
+    "THEAD",
+    "TBODY",
+    "TFOOT",
+    "TR",
+    "TD",
+    "TH",
+    "FIGURE",
+    "FIGCAPTION",
+    "PRE",
+    "BLOCKQUOTE",
+  ]);
+
+  const walk = (el: Element): string => {
+    let out = "";
+    el.childNodes.forEach((child) => {
+      if (child.nodeType === Node.TEXT_NODE) {
+        out += child.textContent || "";
+      } else if (child.nodeType === Node.ELEMENT_NODE) {
+        const c = child as Element;
+        if (c.classList && c.classList.contains("math-inline")) {
+          const latex = c.textContent || "";
+          out += latex ? `$${latex}$` : "";
+        } else if (c.tagName === "BR") {
+          out += " ";
+        } else {
+          const before = out.length;
+          out += walk(c);
+          if (BLOCK_TAGS.has(c.tagName) && out.length > before) {
+            out += " ";
+          }
+        }
+      }
+    });
+    return out;
+  };
+
+  const result = walk(EXTRACTOR_EL);
+  EXTRACTOR_EL.innerHTML = ""; // cleanup
+  return result;
+}
+
+// Convert bare TeX commands inside plain text to InlineMath while preserving text
+function renderTextWithInlineCommands(
+  text: string,
+  keyPrefix: string
+): React.ReactNode[] {
+  const nodes: React.ReactNode[] = [];
+  const regex = RE_BARE_TEX;
+  regex.lastIndex = 0;
+  let lastIndex = 0;
+  let m: RegExpExecArray | null;
+  while ((m = regex.exec(text)) !== null) {
+    const full = m[0];
+    const start = m.index;
+    if (start > lastIndex) {
+      nodes.push(
+        <span
+          key={`${keyPrefix}-t-${start}`}
+          style={{ whiteSpace: "pre-wrap" }}
+        >
+          {text.slice(lastIndex, start)}
+        </span>
+      );
+    }
+    try {
+      nodes.push(<InlineMath key={`${keyPrefix}-m-${start}`} math={full} />);
+    } catch {
+      nodes.push(
+        <span key={`${keyPrefix}-e-${start}`} style={{ color: "#cc0000" }}>
+          {full}
+        </span>
+      );
+    }
+    lastIndex = start + full.length;
+  }
+  if (lastIndex < text.length) {
+    nodes.push(
+      <span key={`${keyPrefix}-t-end`} style={{ whiteSpace: "pre-wrap" }}>
+        {text.slice(lastIndex)}
+      </span>
+    );
+  }
+  return nodes;
+}
+
+// Core rendering logic for mixed content with LaTeX
+function renderMixedContent(text: string): React.ReactNode[] {
+  if (!text) return [];
+
+  const likelyHtml = text.includes("<") && text.includes(">");
+  const hasDollar = text.includes("$");
+  const hasBackslash = text.includes("\\");
+
+  // Fast path: plain text, no math
+  if (!likelyHtml && !hasDollar && !hasBackslash) {
+    const normalized = RE_NBSP.test(text) ? text.replace(RE_NBSP, " ") : text;
+    return [
+      <span key="plain" style={{ whiteSpace: "pre-wrap" }}>
+        {normalized}
+      </span>,
+    ];
+  }
+
+  // If HTML-like, extract text while preserving math spans
+  const extracted = likelyHtml ? extractTextFromHtml(text) : text;
+
+  // Decode entities and normalize NBSP
+  const balanced = decodeHtmlEntities(extracted).replace(RE_NBSP, " ");
+
+  // Split by delimiters and render segments
+  const parts = balanced.split(RE_SPLIT_LATEX);
+  const lastIdx = parts.length - 1;
+  return parts
+    .map((part, i) => {
+      if (!part) return null;
+
+      // Display-mode $$...$$
+      if (part.startsWith("$$") && part.endsWith("$$") && part.length > 4) {
+        const latex = part.slice(2, -2);
+        try {
+          return (
+            <div key={i} style={{ margin: "1em 0" }}>
+              <BlockMath math={latex} />
+            </div>
+          );
+        } catch {
+          return (
+            <span key={i} style={{ color: "#cc0000" }}>
+              {part}
+            </span>
+          );
+        }
+      }
+
+      // Inline $...$
+      if (part.startsWith("$") && part.endsWith("$") && part.length > 2) {
+        const latex = part.slice(1, -1);
+        try {
+          return <InlineMath key={i} math={latex} />;
+        } catch {
+          return (
+            <span key={i} style={{ color: "#cc0000" }}>
+              {part}
+            </span>
+          );
+        }
+      }
+
+      // Plain text (including whitespace-only): also render bare commands like \\theta
+      // Ignore lone $ or $$ artifacts; also strip trailing orphan dollars only on the last segment
+      if (part === "$" || part === "$$") return null;
+      let text = part;
+      if (i === lastIdx) {
+        text = text.replace(/\s*\${1,2}\s*$/, "");
+      }
+      return <span key={i}>{renderTextWithInlineCommands(text, `p${i}`)}</span>;
+    })
+    .filter(Boolean) as React.ReactNode[];
 }
 
 const MathDisplay: React.FC<MathDisplayProps> = ({
   content,
   className = "",
+  displayMode = false,
 }) => {
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!containerRef.current || !content) return;
-
-    const container = containerRef.current;
-
-    // Pre-process content to wrap LaTeX expressions with delimiters if they don't have them
-    let processedContent = preprocessLatexContent(content);
-
-    // Set the HTML content
-    container.innerHTML = processedContent;
-
-    // Use KaTeX auto-render (industry standard approach)
-    renderMathInElement(container, {
-      delimiters: [
-        { left: "$$", right: "$$", display: true },
-        { left: "$", right: "$", display: false },
-        { left: "\\(", right: "\\)", display: false },
-        { left: "\\[", right: "\\]", display: true },
-      ],
-      throwOnError: false,
-      errorColor: "#cc0000",
-      strict: false,
-      trust: false,
-      macros: {
-        "\\f": "#1f(#2)",
-      },
-    });
-  }, [content]);
-  return <div ref={containerRef} className={`math-display ${className}`} />;
-};
-
-// KaTeX Auto-Render Extension Implementation
-// This is the industry standard approach used by Khan Academy, Brilliant.org, etc.
-function renderMathInElement(elem: HTMLElement, options: any) {
-  const delimiters = options.delimiters || [
-    { left: "$$", right: "$$", display: true },
-    { left: "$", right: "$", display: false },
-  ];
-
-  const textNodes = getTextNodesIn(elem);
-
-  textNodes.forEach((textNode) => {
-    const text = textNode.textContent || "";
-
-    for (const delimiter of delimiters) {
-      if (text.includes(delimiter.left)) {
-        processTextNode(textNode, delimiter, options);
-        break;
-      }
+  const rendered = useMemo(() => {
+    try {
+      return renderMixedContent(content);
+    } catch (e) {
+      return e as Error;
     }
-  });
-}
+  }, [content]);
 
-function getTextNodesIn(elem: HTMLElement): Text[] {
-  const textNodes: Text[] = [];
-  const walker = document.createTreeWalker(elem, NodeFilter.SHOW_TEXT, {
-    acceptNode: (node) => {
-      // Skip already processed math elements
-      const parent = node.parentElement;
-      if (
-        parent &&
-        (parent.classList.contains("katex") ||
-          parent.classList.contains("katex-display") ||
-          parent.classList.contains("katex-html"))
-      ) {
-        return NodeFilter.FILTER_REJECT;
-      }
-      return NodeFilter.FILTER_ACCEPT;
-    },
-  });
-
-  let node;
-  while ((node = walker.nextNode())) {
-    textNodes.push(node as Text);
+  if (Array.isArray(rendered)) {
+    return <div className={`math-display ${className}`}>{rendered}</div>;
   }
 
-  return textNodes;
-}
-
-function processTextNode(textNode: Text, delimiter: any, options: any) {
-  const text = textNode.textContent || "";
-  const leftDelim = delimiter.left;
-  const rightDelim = delimiter.right;
-
-  console.log(`Processing text node for delimiter "${leftDelim}":`, text);
-
-  const startIndex = text.indexOf(leftDelim);
-  if (startIndex === -1) {
-    console.log(`No start delimiter "${leftDelim}" found`);
-    return;
-  }
-
-  const endIndex = text.indexOf(rightDelim, startIndex + leftDelim.length);
-  if (endIndex === -1) {
-    console.log(
-      `No end delimiter "${rightDelim}" found after position ${
-        startIndex + leftDelim.length
-      }`
-    );
-    return;
-  }
-
-  const beforeMath = text.substring(0, startIndex);
-  const mathContent = text.substring(startIndex + leftDelim.length, endIndex);
-  const afterMath = text.substring(endIndex + rightDelim.length);
-
-  console.log("Math content to render:", mathContent);
-
-  const fragment = document.createDocumentFragment();
-
-  // Add text before math
-  if (beforeMath) {
-    fragment.appendChild(document.createTextNode(beforeMath));
-  }
-
-  // Create math element
-  const mathElement = document.createElement(
-    delimiter.display ? "div" : "span"
+  // Fallback error UI
+  return (
+    <div
+      className={`math-display ${className}`}
+      style={{
+        color: "#cc0000",
+        padding: "8px",
+        border: "1px solid #cc0000",
+        borderRadius: "4px",
+      }}
+    >
+      Error rendering mathematical notation:{" "}
+      {rendered instanceof Error ? rendered.message : "Unknown error"}
+    </div>
   );
-  mathElement.className = delimiter.display ? "katex-display" : "katex";
-
-  try {
-    console.log("Attempting to render math:", mathContent);
-    katex.render(mathContent, mathElement, {
-      displayMode: delimiter.display,
-      throwOnError: options.throwOnError || false,
-      errorColor: options.errorColor || "#cc0000",
-      strict: options.strict || false,
-      trust: options.trust || false,
-      macros: options.macros || {},
-    });
-    console.log("KaTeX render successful");
-  } catch (error) {
-    console.error("KaTeX rendering error:", error);
-    mathElement.textContent = leftDelim + mathContent + rightDelim;
-    mathElement.style.color = options.errorColor || "#cc0000";
-  }
-
-  fragment.appendChild(mathElement);
-
-  // Add text after math (and process it recursively for more math)
-  if (afterMath) {
-    const remainingTextNode = document.createTextNode(afterMath);
-    fragment.appendChild(remainingTextNode);
-
-    // Process remaining text for more math expressions
-    setTimeout(() => {
-      processTextNode(remainingTextNode, delimiter, options);
-    }, 0);
-  }
-
-  // Replace the original text node
-  if (textNode.parentNode) {
-    console.log("Replacing text node in DOM");
-    textNode.parentNode.replaceChild(fragment, textNode);
-  }
-}
+};
 
 export default MathDisplay;

@@ -51,16 +51,23 @@ class AuthService {
         throw new Error('No refresh token available');
       }
 
-      const response = await mainApi.post<ApiResponse<{ token: string }>>(
+      const response = await mainApi.post<ApiResponse<{ accessToken: string; refreshToken?: string }>>(
         API_ENDPOINTS.REFRESH,
         { refreshToken }
       );
 
-      const { token } = handleApiResponse(response);
-      localStorage.setItem(APP_CONSTANTS.STORAGE_KEYS.AUTH_TOKEN, token);
-      
-      return token;
+      const apiData = handleApiResponse(response);
+      const newToken = apiData.accessToken;
+
+      // Update both tokens if new refresh token provided
+      localStorage.setItem(APP_CONSTANTS.STORAGE_KEYS.AUTH_TOKEN, newToken);
+      if (apiData.refreshToken) {
+        localStorage.setItem(APP_CONSTANTS.STORAGE_KEYS.REFRESH_TOKEN, apiData.refreshToken);
+      }
+
+      return newToken;
     } catch (error: any) {
+      console.warn('Token refresh failed:', error);
       this.logout();
       throw new Error(handleApiError(error));
     }
@@ -93,6 +100,7 @@ class AuthService {
   private storeAuthData(authData: AuthResponse): void {
     localStorage.setItem(APP_CONSTANTS.STORAGE_KEYS.AUTH_TOKEN, authData.token);
     localStorage.setItem(APP_CONSTANTS.STORAGE_KEYS.REFRESH_TOKEN, authData.refreshToken);
+    // Store user data directly (not wrapped in another user object)
     localStorage.setItem(APP_CONSTANTS.STORAGE_KEYS.USER_DATA, JSON.stringify(authData.user));
   }
 

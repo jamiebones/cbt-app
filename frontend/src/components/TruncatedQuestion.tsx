@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import MathDisplay from "./MathDisplay";
-import "./MathDisplay.css";
+import "../styles/components/MathDisplay.css";
 
 interface TruncatedQuestionProps {
   content: string;

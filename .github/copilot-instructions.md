@@ -55,6 +55,39 @@ This is a **monolithic MERN stack** Computer-Based Testing application with Dock
 - **Complete solutions only** - Always investigate and fix ALL issues until 100% success is achieved
 - **No compromise on standards** - Software either works completely or it doesn't work - there's no acceptable middle ground
 
+### Industry Standards & Proven Solutions (CRITICAL)
+
+**When implementing features or solving problems:**
+
+- **Use established libraries & patterns** - Don't reinvent the wheel when industry-standard solutions exist
+- **Follow best practices** - Adhere to community-accepted approaches for common problems
+- **Research before implementing** - Investigate existing solutions before proposing custom implementations
+- **Consider maturity & support** - Prefer well-maintained libraries with active communities
+- **Evaluate trade-offs** - Assess performance, bundle size, and compatibility implications
+- **Document external dependencies** - Always document why a specific library was chosen
+
+**Standard Library Selection Criteria:**
+
+- **Industry adoption** - Is it widely used in production environments?
+- **Maintenance status** - Is it actively maintained with recent releases?
+- **Documentation quality** - Is it well-documented with examples?
+- **Bundle size impact** - Will it significantly increase application size?
+- **License compatibility** - Is the license compatible with our project?
+- **Security considerations** - Does it have a good security track record?
+
+**Common Standard Libraries & Tools:**
+
+- **Authentication**: Passport.js, JWT libraries (jsonwebtoken)
+- **Validation**: Joi, Yup, Zod, express-validator
+- **Testing**: Jest, Vitest, Supertest, React Testing Library
+- **Date/Time**: date-fns, dayjs (lightweight alternative to moment)
+- **Forms**: Formik, React Hook Form
+- **UI Components**: Material-UI, Chakra UI, Shadcn/ui
+- **State Management**: Redux Toolkit, Zustand, Jotai
+- **API Clients**: Axios, TanStack Query (React Query)
+- **File Processing**: multer, sharp (image processing)
+- **Utilities**: lodash (use specific imports), ramda
+
 ## Development Patterns
 
 ### Module Structure (Critical Pattern)

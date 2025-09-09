@@ -33,32 +33,50 @@ const createApiInstance = (baseURL: string): AxiosInstance => {
     },
     async (error: AxiosError) => {
       const originalRequest = error.config as any;
+
       if (error.response?.status === 401 && !originalRequest._retry) {
         originalRequest._retry = true;
 
         try {
           const refreshToken = localStorage.getItem(APP_CONSTANTS.STORAGE_KEYS.REFRESH_TOKEN);
+          console.log('🔄 Token refresh triggered, has refresh token:', !!refreshToken);
           if (refreshToken) {
-            const response = await axios.post(`${config.apiUrl}${API_ENDPOINTS.REFRESH}`, {
+            // Use a separate axios instance to avoid interceptors
+            const refreshResponse = await axios.post(`${config.apiUrl}${API_ENDPOINTS.REFRESH}`, {
               refreshToken,
             });
+            console.log('🔄 Refresh response:', refreshResponse.data);
 
-            const { token } = response.data;
-            localStorage.setItem(APP_CONSTANTS.STORAGE_KEYS.AUTH_TOKEN, token);
+            const { accessToken, refreshToken: newRefreshToken } = refreshResponse.data.data || refreshResponse.data;
 
-            // Retry the original request with new token
-            originalRequest.headers.Authorization = `Bearer ${token}`;
-            return instance(originalRequest);
+            if (accessToken) {
+              console.log('🔄 Token refresh successful, updating tokens');
+              // Update stored tokens
+              localStorage.setItem(APP_CONSTANTS.STORAGE_KEYS.AUTH_TOKEN, accessToken);
+              if (newRefreshToken) {
+                localStorage.setItem(APP_CONSTANTS.STORAGE_KEYS.REFRESH_TOKEN, newRefreshToken);
+              }
+
+              // Retry the original request with new token
+              originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+              return instance(originalRequest);
+            } else {
+              console.warn('🔄 No access token in refresh response');
+            }
+          } else {
+            console.warn('🔄 No refresh token available');
           }
         } catch (refreshError) {
-          // Refresh failed, redirect to login
-          localStorage.removeItem(APP_CONSTANTS.STORAGE_KEYS.AUTH_TOKEN);
-          localStorage.removeItem(APP_CONSTANTS.STORAGE_KEYS.REFRESH_TOKEN);
-          localStorage.removeItem(APP_CONSTANTS.STORAGE_KEYS.USER_DATA);
-          
-          // Dispatch logout event
-          window.dispatchEvent(new CustomEvent('auth:logout'));
+          console.warn('🔄 Token refresh failed:', refreshError);
         }
+
+        // If refresh failed, clear auth and redirect to login
+        localStorage.removeItem(APP_CONSTANTS.STORAGE_KEYS.AUTH_TOKEN);
+        localStorage.removeItem(APP_CONSTANTS.STORAGE_KEYS.REFRESH_TOKEN);
+        localStorage.removeItem(APP_CONSTANTS.STORAGE_KEYS.USER_DATA);
+
+        // Dispatch logout event
+        window.dispatchEvent(new CustomEvent('auth:logout'));
       }
 
       return Promise.reject(error);

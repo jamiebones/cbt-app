@@ -52,9 +52,16 @@ export const getUser = (): { user: User } | null => {
     if (!raw) return null;
 
     const parsed = JSON.parse(raw);
-    // Validate that the parsed data has the nested user structure
-    if (parsed && typeof parsed === 'object' && parsed.user && typeof parsed.user === 'object' && parsed.user.id && parsed.user.email && parsed.user.role) {
-      return parsed as { user: User };
+    // Check if it's already wrapped in user object (from AuthContext)
+    // or if it's a direct user object (from auth service)
+    if (parsed && typeof parsed === 'object') {
+      if (parsed.user && typeof parsed.user === 'object' && parsed.user.id && parsed.user.email && parsed.user.role) {
+        // Already wrapped correctly
+        return parsed as { user: User };
+      } else if (parsed.id && parsed.email && parsed.role) {
+        // Direct user object, wrap it
+        return { user: parsed as User };
+      }
     }
     return null;
   } catch (err) {
@@ -63,11 +70,25 @@ export const getUser = (): { user: User } | null => {
   }
 };
 
-export const setUser = (user: { user: User } | null) => {
+export const setUser = (user: { user: User } | User | null) => {
   try {
     if (typeof window === "undefined") return;
-    if (user === null) localStorage.removeItem(STORAGE_KEYS.USER_DATA);
-    else localStorage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(user));
+    if (user === null) {
+      localStorage.removeItem(STORAGE_KEYS.USER_DATA);
+      return;
+    }
+
+    // Handle both { user: User } and User formats
+    let userToStore: { user: User };
+    if ('user' in user && user.user) {
+      // Already in correct format
+      userToStore = user;
+    } else {
+      // Direct user object, wrap it
+      userToStore = { user: user as User };
+    }
+
+    localStorage.setItem(STORAGE_KEYS.USER_DATA, JSON.stringify(userToStore));
   } catch (err) {
     console.warn("authStorage.setUser error", err);
   }

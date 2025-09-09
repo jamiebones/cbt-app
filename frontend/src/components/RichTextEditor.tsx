@@ -2,7 +2,7 @@
 
 import React from "react";
 import dynamic from "next/dynamic";
-import styles from "./RichTextEditor.module.css";
+import styles from "../styles/components/RichTextEditor.module.css";
 
 // Dynamically import the actual editor component with SSR disabled
 const RichTextEditorClient = dynamic(() => import("./RichTextEditorClient"), {

@@ -171,31 +171,42 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         dispatch({ type: "LOGOUT" });
         return;
       }
+
+      // Try to refresh the token
       const newToken = await authService.refreshToken();
       if (typeof newToken === "string" && newToken) {
         authStorage.setToken(newToken);
-        let user: { user: User } | null = null;
+
+        // Try to get fresh user data
         try {
-          user = await authService.getProfile();
-        } catch (e) {
-          user = null;
-        }
-        if (user) {
-          authStorage.setUser(user);
-          dispatch({
-            type: "RESTORE_AUTH",
-            payload: { user, token: newToken },
-          });
-        } else {
-          dispatch({ type: "LOGOUT" });
+          const userResponse = await authService.getProfile();
+          const user = userResponse; // API returns { user: User }
+          if (user && user.user) {
+            authStorage.setUser(user);
+            dispatch({
+              type: "RESTORE_AUTH",
+              payload: { user, token: newToken },
+            });
+          } else {
+            dispatch({ type: "LOGOUT" });
+          }
+        } catch (profileError) {
+          // If profile fetch fails, try to use cached user data
+          const cachedUser = authStorage.getUser();
+          if (cachedUser) {
+            dispatch({
+              type: "RESTORE_AUTH",
+              payload: { user: cachedUser, token: newToken },
+            });
+          } else {
+            dispatch({ type: "LOGOUT" });
+          }
         }
       } else {
         dispatch({ type: "LOGOUT" });
       }
     } catch (error) {
-      if (process.env.NODE_ENV !== "production") {
-        console.warn("Auth refresh error:", error);
-      }
+      console.warn("Auth refresh error:", error);
       dispatch({ type: "LOGOUT" });
     }
   };
@@ -205,28 +216,63 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     // On mount, only fetch profile if token exists
     const initializeAuth = async () => {
       const token = authStorage.getToken();
+      const refreshToken = authStorage.getRefreshToken();
+      const cachedUser = authStorage.getUser();
+
+      console.log("🔐 Auth initialization:", {
+        hasToken: !!token,
+        hasRefreshToken: !!refreshToken,
+        hasCachedUser: !!cachedUser,
+      });
+
       if (token) {
         dispatch({ type: "AUTH_START" }); // Ensure loading is true while verifying
+
         try {
-          const user = await authService.getProfile();
-          if (user) {
-            authStorage.setUser(user);
-            dispatch({ type: "RESTORE_AUTH", payload: { user, token } });
+          // First try to get fresh user data
+          console.log("🔐 Attempting to fetch user profile...");
+          const userResponse = await authService.getProfile();
+          if (userResponse && userResponse.user) {
+            console.log("🔐 Profile fetch successful");
+            authStorage.setUser(userResponse);
+            dispatch({
+              type: "RESTORE_AUTH",
+              payload: { user: userResponse, token },
+            });
           } else {
-            authStorage.clearAuth();
-            dispatch({ type: "LOGOUT" });
+            throw new Error("Invalid user data");
           }
         } catch (err) {
-          if (process.env.NODE_ENV !== "production") {
-            console.warn("Auth profile fetch error:", err);
+          console.warn("🔐 Profile fetch failed, trying token refresh:", err);
+
+          // If profile fetch fails, try to refresh token
+          try {
+            console.log("🔐 Attempting token refresh...");
+            await refreshAuth();
+          } catch (refreshError) {
+            console.warn("🔐 Token refresh failed:", refreshError);
+
+            // If refresh also fails, try to use cached user data if available
+            if (cachedUser) {
+              console.warn("🔐 Using cached user data as fallback");
+              dispatch({
+                type: "RESTORE_AUTH",
+                payload: { user: cachedUser, token },
+              });
+            } else {
+              // Only logout if we have no cached data
+              console.log("🔐 No cached data available, logging out");
+              authStorage.clearAuth();
+              dispatch({ type: "LOGOUT" });
+            }
           }
-          authStorage.clearAuth();
-          dispatch({ type: "LOGOUT" });
         }
       } else {
+        console.log("🔐 No token found, logging out");
         dispatch({ type: "LOGOUT" }); // Ensure loading is false if no token
       }
     };
+
     initializeAuth();
   }, []);
 

@@ -1,0 +1,58 @@
+/* Math Editor Styles - Simplified for new implementation */
+
+.richTextEditor .math-button:hover {
+  background-color: #e9ecef !important;
+  color: #000 !important;
+}
+
+/* Math Editor Styles - With Debug Support */
+
+.richTextEditor .math-inline {
+  display: inline-block !important; /* Force inline-block display */
+  margin: 0 4px !important;
+  vertical-align: middle !important;
+  background-color: #f8f9fa !important;
+  padding: 2px 6px !important;
+  border-radius: 3px !important;
+  border: 1px solid #e9ecef !important;
+  white-space: nowrap !important;
+  font-size: inherit !important;
+  line-height: inherit !important;
+}
+
+/* KaTeX styling for proper display in editor */
+.richTextEditor .katex {
+  font-size: 1.15em;
+  line-height: 1.2;
+}
+
+.richTextEditor .ck-content span.math-inline {
+  background-color: #f8f9fa;
+  padding: 2px 6px;
+  border-radius: 3px;
+  border: 1px solid #e9ecef;
+  margin: 0 4px;
+  white-space: nowrap;
+}
+
+/* Math preview wrapper for dialog */
+.math-preview-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  padding: 8px;
+}
+
+/* Ensure proper spacing in math expressions */
+.math-inline .katex {
+  margin: 0;
+  padding: 0;
+}
+
+/* Debug mode styles - applied when debug is enabled */
+.richTextEditor .math-inline.debug-active {
+  border: 2px solid #ff6b6b !important;
+  border-radius: 3px !important;
+  background-color: #fff5f5 !important;
+}
