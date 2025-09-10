@@ -264,6 +264,10 @@ export interface QuestionFormData {
   points: number;
   correctAnswer?: string;
   keywords: string[];
+  // Existing media (persisted paths) for edit mode display
+  imagePath?: string;
+  audioPath?: string;
+  videoPath?: string;
   media: {
     image: File | null;
     audio: File | null;

@@ -1,20 +1,14 @@
 "use client";
 import React, { useState, useEffect } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
+
 import {
   Select,
   SelectContent,
@@ -57,10 +51,15 @@ import { Subject, Question, QuestionFormData } from "@/types";
 import { subjectService } from "@/services/subject";
 import { questionService } from "@/services/question";
 import { RichTextEditor } from "@/components/RichTextEditor";
-import MathDisplay from "@/components/MathDisplay";
 import TruncatedQuestion from "@/components/TruncatedQuestion";
+import { mediaService } from "@/services/mediaService";
 import QuestionPreview from "@/components/QuestionPreview";
 import "katex/dist/katex.min.css";
+import QuestionForm from "./QuestionForm";
+import QuestionListItem from "./QuestionListItem";
+import QuestionStats from "./QuestionStats";
+import QuestionFilters from "./QuestionFilters";
+import { config } from "@/utils/config";
 
 const SubjectQuestionsPage = () => {
   const params = useParams();
@@ -78,6 +77,9 @@ const SubjectQuestionsPage = () => {
   const [deleteConfirmationId, setDeleteConfirmationId] = useState<
     string | null
   >(null);
+  const [formValidationError, setFormValidationError] = useState<string | null>(
+    null
+  );
 
   const subjectId = params.id as string;
 
@@ -92,6 +94,9 @@ const SubjectQuestionsPage = () => {
     points: 1,
     correctAnswer: "",
     keywords: [],
+    imagePath: "",
+    audioPath: "",
+    videoPath: "",
     media: {
       image: null,
       audio: null,
@@ -105,8 +110,12 @@ const SubjectQuestionsPage = () => {
     }
   }, [subjectId]);
 
+  const MEDIA_DEBUG = true; // toggle to enable/disable media debugging
+
   const fetchSubjectAndQuestions = async () => {
     try {
+      if (MEDIA_DEBUG)
+        console.log("[MEDIA][fetch] start for subject", subjectId);
       setLoading(true);
       setError(null);
 
@@ -114,11 +123,17 @@ const SubjectQuestionsPage = () => {
         subjectService.getSubjectById(subjectId),
         questionService.getQuestionsBySubject(subjectId),
       ]);
+      if (MEDIA_DEBUG)
+        console.log(
+          "[MEDIA][fetch] questions fetched",
+          questionsData.map((q) => ({ id: q.id, media: (q as any).media }))
+        );
 
       setSubject(subjectData);
       setQuestions(questionsData);
     } catch (err: any) {
       setError(err.message || "Failed to load subject and questions");
+      if (MEDIA_DEBUG) console.log("[MEDIA][fetch][error]", err);
     } finally {
       setLoading(false);
     }
@@ -137,6 +152,37 @@ const SubjectQuestionsPage = () => {
 
   const handleCreateQuestion = async () => {
     try {
+      if (MEDIA_DEBUG)
+        console.log("[MEDIA][create] submit start", { formData });
+      // Validation: multiple_choice must have exactly one correct answer
+      if (formData.type === "multiple_choice") {
+        const validAnswers = formData.answers.filter(
+          (a) => a.text.trim() !== ""
+        );
+        const correctCount = validAnswers.filter((a) => a.isCorrect).length;
+        if (correctCount !== 1) {
+          setFormValidationError(
+            correctCount === 0
+              ? "Select one correct answer before saving."
+              : "Only one answer can be marked correct."
+          );
+          return;
+        }
+      }
+      // True/False: exactly one answer should be correct if two present
+      if (formData.type === "true_false") {
+        const nonEmpty = formData.answers.filter((a) => a.text.trim() !== "");
+        if (nonEmpty.length === 2) {
+          const correctCount = nonEmpty.filter((a) => a.isCorrect).length;
+          if (correctCount !== 1) {
+            setFormValidationError(
+              "Mark exactly one option as correct for True/False."
+            );
+            return;
+          }
+        }
+      }
+      setFormValidationError(null);
       // Generate answer IDs (A, B, C, D, etc.)
       const answersWithIds = formData.answers
         .filter((answer) => answer.text.trim() !== "")
@@ -145,6 +191,10 @@ const SubjectQuestionsPage = () => {
           text: answer.text,
           isCorrect: answer.isCorrect,
         }));
+
+      const mediaPaths = await uploadSelectedMedia();
+      if (MEDIA_DEBUG)
+        console.log("[MEDIA][create] uploadSelectedMedia result", mediaPaths);
 
       const questionData = {
         questionText: formData.text,
@@ -155,8 +205,10 @@ const SubjectQuestionsPage = () => {
         difficulty: formData.difficulty,
         points: formData.points,
         keywords: formData.keywords,
-        media: formData.media,
+        media: mediaPaths,
       };
+      if (MEDIA_DEBUG)
+        console.log("[MEDIA][create] final payload", questionData);
 
       await questionService.createQuestion(questionData);
       setIsCreateDialogOpen(false);
@@ -164,6 +216,7 @@ const SubjectQuestionsPage = () => {
       fetchSubjectAndQuestions();
     } catch (err: any) {
       setError(err.message || "Failed to create question");
+      if (MEDIA_DEBUG) console.log("[MEDIA][create][error]", err);
     }
   };
 
@@ -171,6 +224,38 @@ const SubjectQuestionsPage = () => {
     if (!editingQuestion) return;
 
     try {
+      if (MEDIA_DEBUG)
+        console.log("[MEDIA][update] submit start", {
+          editingId: editingQuestion.id,
+          formData,
+        });
+      if (formData.type === "multiple_choice") {
+        const validAnswers = formData.answers.filter(
+          (a) => a.text.trim() !== ""
+        );
+        const correctCount = validAnswers.filter((a) => a.isCorrect).length;
+        if (correctCount !== 1) {
+          setFormValidationError(
+            correctCount === 0
+              ? "Select one correct answer before saving."
+              : "Only one answer can be marked correct."
+          );
+          return;
+        }
+      }
+      if (formData.type === "true_false") {
+        const nonEmpty = formData.answers.filter((a) => a.text.trim() !== "");
+        if (nonEmpty.length === 2) {
+          const correctCount = nonEmpty.filter((a) => a.isCorrect).length;
+          if (correctCount !== 1) {
+            setFormValidationError(
+              "Mark exactly one option as correct for True/False."
+            );
+            return;
+          }
+        }
+      }
+      setFormValidationError(null);
       // Generate answer IDs (A, B, C, D, etc.)
       const answersWithIds = formData.answers
         .filter((answer) => answer.text.trim() !== "")
@@ -179,6 +264,10 @@ const SubjectQuestionsPage = () => {
           text: answer.text,
           isCorrect: answer.isCorrect,
         }));
+
+      const mediaPaths = await uploadSelectedMedia();
+      if (MEDIA_DEBUG)
+        console.log("[MEDIA][update] uploadSelectedMedia result", mediaPaths);
 
       const questionData = {
         questionText: formData.text,
@@ -189,8 +278,10 @@ const SubjectQuestionsPage = () => {
         difficulty: formData.difficulty,
         points: formData.points,
         keywords: formData.keywords,
-        media: formData.media,
+        media: mediaPaths,
       };
+      if (MEDIA_DEBUG)
+        console.log("[MEDIA][update] final payload", questionData);
 
       await questionService.updateQuestion(editingQuestion.id, questionData);
       setEditingQuestion(null);
@@ -198,6 +289,7 @@ const SubjectQuestionsPage = () => {
       fetchSubjectAndQuestions();
     } catch (err: any) {
       setError(err.message || "Failed to update question");
+      if (MEDIA_DEBUG) console.log("[MEDIA][update][error]", err);
     }
   };
 
@@ -234,12 +326,18 @@ const SubjectQuestionsPage = () => {
       points: 1,
       correctAnswer: "",
       keywords: [],
+      imagePath: "",
+      audioPath: "",
+      videoPath: "",
       media: {
         image: null,
         audio: null,
         video: null,
       },
     });
+    setTempMedia({ image: null, audio: null, video: null });
+    setMediaProgress({ image: 0, audio: 0, video: 0 });
+    setMediaError(null);
   };
 
   const addAnswer = () => {
@@ -267,6 +365,14 @@ const SubjectQuestionsPage = () => {
 
   const startEdit = (question: Question) => {
     setEditingQuestion(question);
+    const media = (question as any).media || {};
+    if (MEDIA_DEBUG)
+      console.log(
+        "[MEDIA][edit] startEdit with question media",
+        media,
+        "questionId",
+        question.id
+      );
     setFormData({
       text: question.questionText || question.text || "",
       explanation: (question as any).explanation || "",
@@ -280,28 +386,115 @@ const SubjectQuestionsPage = () => {
       points: (question as any).points || 1,
       correctAnswer: (question as any).correctAnswer || "",
       keywords: (question as any).keywords || [],
+      imagePath: resolveMediaPath(media.image),
+      audioPath: resolveMediaPath(media.audio),
+      videoPath: resolveMediaPath(media.video),
       media: {
-        image: null,
-        audio: null,
-        video: null,
+        image: media.image || null,
+        audio: media.audio || null,
+        video: media.video || null,
       },
     });
   };
 
-  const getDifficultyBadge = (difficulty: string) => {
-    const colors = {
-      easy: "bg-green-100 text-green-800",
-      medium: "bg-yellow-100 text-yellow-800",
-      hard: "bg-red-100 text-red-800",
-    };
+  // Temporary selected files & progress state (not uploaded yet)
+  const [tempMedia, setTempMedia] = useState<{
+    image: File | null;
+    audio: File | null;
+    video: File | null;
+  }>({ image: null, audio: null, video: null });
+  const [mediaProgress, setMediaProgress] = useState<{
+    image: number;
+    audio: number;
+    video: number;
+  }>({ image: 0, audio: 0, video: 0 });
+  const [mediaUploading, setMediaUploading] = useState(false);
+  const [mediaError, setMediaError] = useState<string | null>(null);
+  const handleSelectMedia = (
+    type: "image" | "audio" | "video",
+    file: File | null
+  ) => {
+    setTempMedia((prev) => ({ ...prev, [type]: file }));
+    setMediaProgress((prev) => ({ ...prev, [type]: 0 }));
+    if (file) setMediaError(null);
+  };
 
-    return (
-      <Badge
-        className={colors[difficulty as keyof typeof colors] || colors.medium}
-      >
-        {difficulty}
-      </Badge>
-    );
+  const uploadSelectedMedia = async () => {
+    const result: any = { ...formData.media };
+    if (MEDIA_DEBUG)
+      console.log(
+        "[MEDIA][upload] starting with tempMedia",
+        tempMedia,
+        "existing result",
+        result
+      );
+    setMediaError(null);
+    const mapping: Array<{
+      type: "image" | "audio" | "video";
+      uploader: () => Promise<string>;
+    }> = [];
+    if (tempMedia.image)
+      mapping.push({
+        type: "image",
+        uploader: async () =>
+          (
+            await mediaService.uploadImage(tempMedia.image!, {
+              onProgress: (p) =>
+                setMediaProgress((pr) => ({ ...pr, image: p })),
+            })
+          ).filePath,
+      });
+    if (tempMedia.audio)
+      mapping.push({
+        type: "audio",
+        uploader: async () =>
+          (
+            await mediaService.uploadAudio(tempMedia.audio!, (p) =>
+              setMediaProgress((pr) => ({ ...pr, audio: p }))
+            )
+          ).filePath,
+      });
+    if (tempMedia.video)
+      mapping.push({
+        type: "video",
+        uploader: async () =>
+          (
+            await mediaService.uploadVideo(tempMedia.video!, {
+              onProgress: (p) =>
+                setMediaProgress((pr) => ({ ...pr, video: p })),
+            })
+          ).filePath,
+      });
+    if (mapping.length === 0) return result; // nothing to upload
+    setMediaUploading(true);
+    try {
+      await Promise.all(
+        mapping.map(async (m) => {
+          if (MEDIA_DEBUG) console.log("[MEDIA][upload] uploading", m.type);
+          const path = await m.uploader();
+          result[m.type] = path;
+          if (MEDIA_DEBUG)
+            console.log("[MEDIA][upload] uploaded", m.type, path);
+        })
+      );
+    } catch (e: any) {
+      setMediaError(e.message || "Media upload failed");
+      if (MEDIA_DEBUG) console.log("[MEDIA][upload][error]", e);
+      throw e;
+    } finally {
+      setMediaUploading(false);
+      if (MEDIA_DEBUG) console.log("[MEDIA][upload] complete result", result);
+    }
+    return result;
+  };
+
+  const resolveMediaPath = (p?: string | null) => {
+    if (!p) return "";
+    if (p.startsWith("http://") || p.startsWith("https://")) return p;
+    // ensure single slash join
+    return `${config.apiUrl.replace(/\/$/, "")}${
+      p.startsWith("/") ? "" : "/"
+    }${p}`;
   };
 
   if (loading) {
@@ -349,6 +542,7 @@ const SubjectQuestionsPage = () => {
   return (
     <ProtectedRoute requiredAuth={true}>
       <div className="container mx-auto px-4 py-8 max-w-7xl">
+        {/* Hidden hybrid media state debug (could remove in production) */}
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-4">
@@ -392,119 +586,30 @@ const SubjectQuestionsPage = () => {
                 addAnswer={addAnswer}
                 updateAnswer={updateAnswer}
                 removeAnswer={removeAnswer}
+                formValidationError={formValidationError}
+                tempMedia={tempMedia}
+                mediaProgress={mediaProgress}
+                mediaUploading={mediaUploading}
+                mediaError={mediaError}
+                onSelectMedia={handleSelectMedia}
+                isEditing={false}
               />
             </DialogContent>
           </Dialog>
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Total Questions</p>
-                  <p className="text-2xl font-bold">{questions.length}</p>
-                </div>
-                <FileText className="h-8 w-8 text-blue-500" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Easy</p>
-                  <p className="text-2xl font-bold">
-                    {
-                      questions.filter((q) => (q as any).difficulty === "easy")
-                        .length
-                    }
-                  </p>
-                </div>
-                <CheckCircle className="h-8 w-8 text-green-500" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Medium</p>
-                  <p className="text-2xl font-bold">
-                    {
-                      questions.filter(
-                        (q) => (q as any).difficulty === "medium"
-                      ).length
-                    }
-                  </p>
-                </div>
-                <CheckCircle className="h-8 w-8 text-yellow-500" />
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">Hard</p>
-                  <p className="text-2xl font-bold">
-                    {
-                      questions.filter((q) => (q as any).difficulty === "hard")
-                        .length
-                    }
-                  </p>
-                </div>
-                <CheckCircle className="h-8 w-8 text-red-500" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <QuestionStats questions={questions} />
 
         {/* Filters and Search */}
-        <Card className="mb-6">
-          <CardContent className="p-4">
-            <div className="flex flex-col md:flex-row gap-4">
-              <div className="flex-1">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input
-                    placeholder="Search questions..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-              </div>
-              <Select
-                value={difficultyFilter}
-                onValueChange={setDifficultyFilter}
-              >
-                <SelectTrigger className="w-full md:w-48">
-                  <SelectValue placeholder="Difficulty" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Difficulties</SelectItem>
-                  <SelectItem value="easy">Easy</SelectItem>
-                  <SelectItem value="medium">Medium</SelectItem>
-                  <SelectItem value="hard">Hard</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={typeFilter} onValueChange={setTypeFilter}>
-                <SelectTrigger className="w-full md:w-48">
-                  <SelectValue placeholder="Question Type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="multiple_choice">
-                    Multiple Choice
-                  </SelectItem>
-                  <SelectItem value="true_false">True or False</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </CardContent>
-        </Card>
+        <QuestionFilters
+          searchTerm={searchTerm}
+          onSearchChange={setSearchTerm}
+          difficultyFilter={difficultyFilter}
+          onDifficultyFilterChange={setDifficultyFilter}
+          typeFilter={typeFilter}
+          onTypeFilterChange={setTypeFilter}
+        />
 
         {/* Bulk Actions */}
         {selectedQuestions.length > 0 && (
@@ -576,112 +681,25 @@ const SubjectQuestionsPage = () => {
             </Card>
           ) : (
             filteredQuestions.map((question) => (
-              <Card
+              <QuestionListItem
                 key={question.id}
-                className="hover:shadow-md transition-shadow"
-              >
-                <CardContent className="p-6">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <Checkbox
-                          checked={selectedQuestions.includes(question.id)}
-                          onCheckedChange={(checked) => {
-                            if (checked) {
-                              setSelectedQuestions([
-                                ...selectedQuestions,
-                                question.id,
-                              ]);
-                            } else {
-                              setSelectedQuestions(
-                                selectedQuestions.filter(
-                                  (id) => id !== question.id
-                                )
-                              );
-                            }
-                          }}
-                        />
-                        {getDifficultyBadge(
-                          (question as any).difficulty || "medium"
-                        )}
-                        <Badge variant="outline">
-                          {question.type === "multiple_choice"
-                            ? "Multiple Choice"
-                            : question.type === "true_false"
-                            ? "True or False"
-                            : question.type}
-                        </Badge>
-                      </div>
-                      <div className="text-lg font-medium text-gray-900 mb-2">
-                        <TruncatedQuestion
-                          content={question.questionText || question.text || ""}
-                          maxLength={200}
-                        />
-                      </div>
-                      <div className="text-sm text-gray-600">
-                        <p>{question.answers?.length || 0} answers</p>
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => startEdit(question)}
-                      >
-                        <Edit className="h-4 w-4 mr-2" />
-                        Edit
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setPreviewQuestion(question)}
-                      >
-                        <Eye className="h-4 w-4 mr-2" />
-                        Preview
-                      </Button>
-                      <AlertDialog
-                        open={deleteConfirmationId === question.id}
-                        onOpenChange={(open) => {
-                          if (!open) setDeleteConfirmationId(null);
-                        }}
-                      >
-                        <AlertDialogTrigger asChild>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setDeleteConfirmationId(question.id)}
-                            className="text-red-600 hover:text-red-700"
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Delete
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Delete Question</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              Are you sure you want to delete this question?
-                              This action cannot be undone.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel
-                              onClick={() => setDeleteConfirmationId(null)}
-                            >
-                              Cancel
-                            </AlertDialogCancel>
-                            <AlertDialogAction
-                              onClick={() => handleDeleteQuestion(question.id)}
-                            >
-                              Delete
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+                question={question}
+                isSelected={selectedQuestions.includes(question.id)}
+                onSelect={(checked) => {
+                  if (checked) {
+                    setSelectedQuestions([...selectedQuestions, question.id]);
+                  } else {
+                    setSelectedQuestions(
+                      selectedQuestions.filter((id) => id !== question.id)
+                    );
+                  }
+                }}
+                onEdit={() => startEdit(question)}
+                onPreview={() => setPreviewQuestion(question)}
+                onDelete={() => handleDeleteQuestion(question.id)}
+                deleteConfirmationId={deleteConfirmationId}
+                setDeleteConfirmationId={setDeleteConfirmationId}
+              />
             ))
           )}
         </div>
@@ -714,6 +732,13 @@ const SubjectQuestionsPage = () => {
                 addAnswer={addAnswer}
                 updateAnswer={updateAnswer}
                 removeAnswer={removeAnswer}
+                formValidationError={formValidationError}
+                tempMedia={tempMedia}
+                mediaProgress={mediaProgress}
+                mediaUploading={mediaUploading}
+                mediaError={mediaError}
+                onSelectMedia={handleSelectMedia}
+                isEditing={true}
               />
             </DialogContent>
           </Dialog>
@@ -723,320 +748,6 @@ const SubjectQuestionsPage = () => {
   );
 };
 
-// Question Form Component
-const QuestionForm: React.FC<{
-  formData: any;
-  setFormData: (data: any) => void;
-  onSubmit: () => void;
-  onCancel: () => void;
-  addAnswer: () => void;
-  updateAnswer: (index: number, field: string, value: any) => void;
-  removeAnswer: (index: number) => void;
-}> = ({
-  formData,
-  setFormData,
-  onSubmit,
-  onCancel,
-  addAnswer,
-  updateAnswer,
-  removeAnswer,
-}) => {
-  const [mediaFiles, setMediaFiles] = useState<{
-    image: File | null;
-    audio: File | null;
-    video: File | null;
-  }>({
-    image: null,
-    audio: null,
-    video: null,
-  });
-
-  const handleFileChange = (
-    type: "image" | "audio" | "video",
-    file: File | null
-  ) => {
-    setMediaFiles((prev) => ({ ...prev, [type]: file }));
-    setFormData((prev) => ({
-      ...prev,
-      media: {
-        ...prev.media,
-        [type]: file,
-      },
-    }));
-  };
-
-  const handleSubmit = () => {
-    onSubmit();
-  };
-
-  return (
-    <div className="space-y-8 p-2">
-      <div>
-        <Label htmlFor="question-text" className="text-base font-medium">
-          Question Text *
-        </Label>
-        <div className="mt-2">
-          <RichTextEditor
-            value={formData.text}
-            onChange={(value) => setFormData({ ...formData, text: value })}
-            placeholder="Enter your question here. You can include mathematical equations using the math button in the toolbar."
-            height="120px"
-          />
-        </div>
-      </div>
-
-      <div>
-        <Label htmlFor="question-explanation" className="text-base font-medium">
-          Explanation (Optional)
-        </Label>
-        <div className="mt-2">
-          <RichTextEditor
-            value={formData.explanation || ""}
-            onChange={(value) =>
-              setFormData({ ...formData, explanation: value })
-            }
-            placeholder="Provide an explanation or additional context for this question. You can include mathematical equations and formatting."
-            height="100px"
-          />
-        </div>
-        <p className="text-xs text-gray-500 mt-1">
-          {formData.explanation
-            ? formData.explanation.replace(/<[^>]*>/g, "").length
-            : 0}
-          /1000 characters
-        </p>
-      </div>
-      <div className="grid grid-cols-2 gap-6">
-        <div>
-          <Label htmlFor="question-type" className="text-base font-medium">
-            Question Type
-          </Label>
-          <Select
-            value={formData.type}
-            onValueChange={(value: "multiple_choice" | "true_false") =>
-              setFormData({ ...formData, type: value })
-            }
-          >
-            <SelectTrigger className="mt-2">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="multiple_choice">Multiple Choice</SelectItem>
-              <SelectItem value="true_false">True or False</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div>
-          <Label htmlFor="difficulty" className="text-base font-medium">
-            Difficulty
-          </Label>
-          <Select
-            value={formData.difficulty}
-            onValueChange={(value: "easy" | "medium" | "hard") =>
-              setFormData({ ...formData, difficulty: value })
-            }
-          >
-            <SelectTrigger className="mt-2">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="easy">Easy</SelectItem>
-              <SelectItem value="medium">Medium</SelectItem>
-              <SelectItem value="hard">Hard</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-6">
-        <div>
-          <Label htmlFor="points">Points *</Label>
-          <Input
-            id="points"
-            type="number"
-            min="1"
-            max="100"
-            value={formData.points}
-            onChange={(e) =>
-              setFormData({
-                ...formData,
-                points: parseInt(e.target.value) || 1,
-              })
-            }
-            placeholder="1"
-            required
-            className="mt-2"
-          />
-        </div>
-
-        <div>
-          <Label htmlFor="keywords">Keywords (comma-separated)</Label>
-          <Input
-            id="keywords"
-            value={formData.keywords?.join(", ") || ""}
-            onChange={(e) =>
-              setFormData({
-                ...formData,
-                keywords: e.target.value
-                  .split(",")
-                  .map((k) => k.trim())
-                  .filter((k) => k.length > 0),
-              })
-            }
-            placeholder="math, algebra, equations"
-            className="mt-2"
-          />
-        </div>
-      </div>
-
-      {/* Media Upload Section */}
-      <div className="space-y-6">
-        <Label className="text-base font-medium">Media (Optional)</Label>
-
-        <div>
-          <Label htmlFor="media-upload" className="text-sm font-medium">
-            Upload Media File
-          </Label>
-          <div className="mt-2 p-4 border-2 border-dashed border-gray-300 rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors">
-            <Input
-              id="media-upload"
-              type="file"
-              accept="image/*,audio/*,video/*"
-              onChange={(e) => {
-                const file = e.target.files?.[0] || null;
-                if (file) {
-                  const fileType = file.type.split("/")[0]; // 'image', 'audio', or 'video'
-                  handleFileChange(
-                    fileType as "image" | "audio" | "video",
-                    file
-                  );
-                } else {
-                  // Clear all media files if no file selected
-                  handleFileChange("image", null);
-                  handleFileChange("audio", null);
-                  handleFileChange("video", null);
-                }
-              }}
-              className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100 w-full"
-            />
-            <p className="text-xs text-gray-500 mt-2">
-              Supported formats: Images (JPG, PNG, GIF), Audio (MP3, WAV), Video
-              (MP4, AVI)
-            </p>
-
-            {/* Display selected files */}
-            {(mediaFiles.image || mediaFiles.audio || mediaFiles.video) && (
-              <div className="mt-3 space-y-2">
-                {mediaFiles.image && (
-                  <div className="flex items-center gap-2 text-sm text-blue-600">
-                    <span className="font-medium">Image:</span>{" "}
-                    {mediaFiles.image.name}
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleFileChange("image", null)}
-                      className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
-                    >
-                      <XCircle className="h-4 w-4" />
-                    </Button>
-                  </div>
-                )}
-                {mediaFiles.audio && (
-                  <div className="flex items-center gap-2 text-sm text-green-600">
-                    <span className="font-medium">Audio:</span>{" "}
-                    {mediaFiles.audio.name}
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleFileChange("audio", null)}
-                      className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
-                    >
-                      <XCircle className="h-4 w-4" />
-                    </Button>
-                  </div>
-                )}
-                {mediaFiles.video && (
-                  <div className="flex items-center gap-2 text-sm text-purple-600">
-                    <span className="font-medium">Video:</span>{" "}
-                    {mediaFiles.video.name}
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleFileChange("video", null)}
-                      className="h-6 w-6 p-0 text-red-500 hover:text-red-700"
-                    >
-                      <XCircle className="h-4 w-4" />
-                    </Button>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <div>
-        <Label className="text-base font-medium">Answers</Label>
-        <div className="space-y-3 mt-4">
-          {formData.answers.map((answer: any, index: number) => (
-            <div
-              key={index}
-              className="flex items-center gap-3 p-3 border border-gray-200 rounded-lg"
-            >
-              <Checkbox
-                checked={answer.isCorrect}
-                onCheckedChange={(checked) =>
-                  updateAnswer(index, "isCorrect", checked)
-                }
-              />
-              <div className="flex-1">
-                <RichTextEditor
-                  value={answer.text}
-                  onChange={(value) => updateAnswer(index, "text", value)}
-                  placeholder={`Enter answer ${
-                    index + 1
-                  }. You can include mathematical equations.`}
-                  height="80px"
-                />
-              </div>
-              {formData.answers.length > 1 && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => removeAnswer(index)}
-                  className="text-red-600 hover:text-red-700"
-                >
-                  <XCircle className="h-4 w-4" />
-                </Button>
-              )}
-            </div>
-          ))}
-        </div>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={addAnswer}
-          className="mt-4"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Add Answer
-        </Button>
-      </div>
-
-      <div className="flex justify-end gap-2 pt-4">
-        <Button type="button" variant="outline" onClick={onCancel}>
-          Cancel
-        </Button>
-        <Button onClick={handleSubmit}>Save Question</Button>
-      </div>
-    </div>
-  );
-};
+// Removed HybridMediaPreview - previews handled directly within QuestionForm
 
 export default SubjectQuestionsPage;

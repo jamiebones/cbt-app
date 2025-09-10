@@ -7,7 +7,7 @@ import "katex/dist/katex.min.css";
 interface MathDisplayProps {
   content: string;
   className?: string;
-  displayMode?: boolean; // reserved; decisions are made by delimiters within content
+  displayMode?: boolean; 
 }
 
 // Hoisted, precompiled regexes for performance
@@ -15,7 +15,6 @@ const RE_SPLIT_LATEX = /(\$\$[\s\S]*?\$\$|\$[\s\S]+?\$)/g;
 const RE_BARE_TEX = /(\\[a-zA-Z]+(?:\{[^}]*\})*)/g;
 const RE_NBSP = /\u00A0|\xA0/g;
 
-// Lazily created shared DOM elements (client-only)
 let DECODER_EL: HTMLTextAreaElement | null = null;
 let EXTRACTOR_EL: HTMLDivElement | null = null;
 

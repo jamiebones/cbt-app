@@ -120,8 +120,18 @@ app.use('/api/subscriptions', subscriptionRoutes);
 app.use('/api/sync', syncRoutes);
 app.use('/api/analytics', analyticsRoutes);
 
-// Serve uploaded files
-app.use('/uploads', express.static(process.env.UPLOAD_PATH || './uploads'));
+// Serve uploaded files with relaxed cross-origin resource policy in development so frontend (3000) can embed them
+if (NODE_ENV === 'development') {
+    app.use('/uploads', (req, res, next) => {
+        // Allow embedding from dev frontends
+        res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+        res.setHeader('Access-Control-Allow-Origin', 'http://localhost:3000');
+        res.setHeader('Access-Control-Allow-Credentials', 'true');
+        next();
+    }, express.static(process.env.UPLOAD_PATH || './uploads'));
+} else {
+    app.use('/uploads', express.static(process.env.UPLOAD_PATH || './uploads'));
+}
 
 // Error handling middleware (must be last)
 app.use(notFoundHandler);
@@ -142,7 +152,7 @@ const startServer = async () => {
         // Connect to databases
         await connectDatabase();
         await connectRedis();
-        
+
         await ensureSuperAdmin(userService);
 
         app.listen(PORT, '0.0.0.0', () => {
