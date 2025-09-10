@@ -5,18 +5,7 @@ import Link from "next/link";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -36,22 +25,10 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import {
-  ArrowLeft,
-  Plus,
-  Edit,
-  Trash2,
-  Search,
-  FileText,
-  CheckCircle,
-  XCircle,
-  Eye,
-} from "lucide-react";
+import { ArrowLeft, Plus, Trash2, FileText, XCircle } from "lucide-react";
 import { Subject, Question, QuestionFormData } from "@/types";
 import { subjectService } from "@/services/subject";
 import { questionService } from "@/services/question";
-import { RichTextEditor } from "@/components/RichTextEditor";
-import TruncatedQuestion from "@/components/TruncatedQuestion";
 import { mediaService } from "@/services/mediaService";
 import QuestionPreview from "@/components/QuestionPreview";
 import "katex/dist/katex.min.css";
@@ -59,7 +36,9 @@ import QuestionForm from "./QuestionForm";
 import QuestionListItem from "./QuestionListItem";
 import QuestionStats from "./QuestionStats";
 import QuestionFilters from "./QuestionFilters";
-import { config } from "@/utils/config";
+import { config, USER_ROLES } from "@/utils/config";
+import { useAuth } from "@/contexts/AuthContext";
+import ExcelImportPanel from "@/components/ExcelImportPanel";
 
 const SubjectQuestionsPage = () => {
   const params = useParams();
@@ -80,6 +59,10 @@ const SubjectQuestionsPage = () => {
   const [formValidationError, setFormValidationError] = useState<string | null>(
     null
   );
+  const [showExcelImport, setShowExcelImport] = useState(false);
+  // Use auth context instead of manual localStorage parsing
+  const { state: authState } = useAuth();
+  const currentUserRole = authState.user?.user?.role || null;
 
   const subjectId = params.id as string;
 
@@ -110,12 +93,10 @@ const SubjectQuestionsPage = () => {
     }
   }, [subjectId]);
 
-  const MEDIA_DEBUG = true; // toggle to enable/disable media debugging
+  // Removed localStorage role loading: role now derived from AuthContext
 
   const fetchSubjectAndQuestions = async () => {
     try {
-      if (MEDIA_DEBUG)
-        console.log("[MEDIA][fetch] start for subject", subjectId);
       setLoading(true);
       setError(null);
 
@@ -123,17 +104,10 @@ const SubjectQuestionsPage = () => {
         subjectService.getSubjectById(subjectId),
         questionService.getQuestionsBySubject(subjectId),
       ]);
-      if (MEDIA_DEBUG)
-        console.log(
-          "[MEDIA][fetch] questions fetched",
-          questionsData.map((q) => ({ id: q.id, media: (q as any).media }))
-        );
-
       setSubject(subjectData);
       setQuestions(questionsData);
     } catch (err: any) {
       setError(err.message || "Failed to load subject and questions");
-      if (MEDIA_DEBUG) console.log("[MEDIA][fetch][error]", err);
     } finally {
       setLoading(false);
     }
@@ -152,8 +126,6 @@ const SubjectQuestionsPage = () => {
 
   const handleCreateQuestion = async () => {
     try {
-      if (MEDIA_DEBUG)
-        console.log("[MEDIA][create] submit start", { formData });
       // Validation: multiple_choice must have exactly one correct answer
       if (formData.type === "multiple_choice") {
         const validAnswers = formData.answers.filter(
@@ -193,9 +165,6 @@ const SubjectQuestionsPage = () => {
         }));
 
       const mediaPaths = await uploadSelectedMedia();
-      if (MEDIA_DEBUG)
-        console.log("[MEDIA][create] uploadSelectedMedia result", mediaPaths);
-
       const questionData = {
         questionText: formData.text,
         explanation: formData.explanation,
@@ -207,8 +176,6 @@ const SubjectQuestionsPage = () => {
         keywords: formData.keywords,
         media: mediaPaths,
       };
-      if (MEDIA_DEBUG)
-        console.log("[MEDIA][create] final payload", questionData);
 
       await questionService.createQuestion(questionData);
       setIsCreateDialogOpen(false);
@@ -216,7 +183,6 @@ const SubjectQuestionsPage = () => {
       fetchSubjectAndQuestions();
     } catch (err: any) {
       setError(err.message || "Failed to create question");
-      if (MEDIA_DEBUG) console.log("[MEDIA][create][error]", err);
     }
   };
 
@@ -224,11 +190,6 @@ const SubjectQuestionsPage = () => {
     if (!editingQuestion) return;
 
     try {
-      if (MEDIA_DEBUG)
-        console.log("[MEDIA][update] submit start", {
-          editingId: editingQuestion.id,
-          formData,
-        });
       if (formData.type === "multiple_choice") {
         const validAnswers = formData.answers.filter(
           (a) => a.text.trim() !== ""
@@ -266,9 +227,6 @@ const SubjectQuestionsPage = () => {
         }));
 
       const mediaPaths = await uploadSelectedMedia();
-      if (MEDIA_DEBUG)
-        console.log("[MEDIA][update] uploadSelectedMedia result", mediaPaths);
-
       const questionData = {
         questionText: formData.text,
         explanation: formData.explanation,
@@ -280,16 +238,12 @@ const SubjectQuestionsPage = () => {
         keywords: formData.keywords,
         media: mediaPaths,
       };
-      if (MEDIA_DEBUG)
-        console.log("[MEDIA][update] final payload", questionData);
-
       await questionService.updateQuestion(editingQuestion.id, questionData);
       setEditingQuestion(null);
       resetForm();
       fetchSubjectAndQuestions();
     } catch (err: any) {
       setError(err.message || "Failed to update question");
-      if (MEDIA_DEBUG) console.log("[MEDIA][update][error]", err);
     }
   };
 
@@ -366,13 +320,7 @@ const SubjectQuestionsPage = () => {
   const startEdit = (question: Question) => {
     setEditingQuestion(question);
     const media = (question as any).media || {};
-    if (MEDIA_DEBUG)
-      console.log(
-        "[MEDIA][edit] startEdit with question media",
-        media,
-        "questionId",
-        question.id
-      );
+   
     setFormData({
       text: question.questionText || question.text || "",
       explanation: (question as any).explanation || "",
@@ -421,13 +369,6 @@ const SubjectQuestionsPage = () => {
 
   const uploadSelectedMedia = async () => {
     const result: any = { ...formData.media };
-    if (MEDIA_DEBUG)
-      console.log(
-        "[MEDIA][upload] starting with tempMedia",
-        tempMedia,
-        "existing result",
-        result
-      );
     setMediaError(null);
     const mapping: Array<{
       type: "image" | "audio" | "video";
@@ -470,20 +411,15 @@ const SubjectQuestionsPage = () => {
     try {
       await Promise.all(
         mapping.map(async (m) => {
-          if (MEDIA_DEBUG) console.log("[MEDIA][upload] uploading", m.type);
           const path = await m.uploader();
           result[m.type] = path;
-          if (MEDIA_DEBUG)
-            console.log("[MEDIA][upload] uploaded", m.type, path);
         })
       );
     } catch (e: any) {
       setMediaError(e.message || "Media upload failed");
-      if (MEDIA_DEBUG) console.log("[MEDIA][upload][error]", e);
       throw e;
     } finally {
       setMediaUploading(false);
-      if (MEDIA_DEBUG) console.log("[MEDIA][upload] complete result", result);
     }
     return result;
   };
@@ -561,42 +497,68 @@ const SubjectQuestionsPage = () => {
               </p>
             </div>
           </div>
-          <Dialog
-            open={isCreateDialogOpen}
-            onOpenChange={setIsCreateDialogOpen}
-          >
-            <DialogTrigger asChild>
-              <Button onClick={resetForm}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Question
+       
+          <div className="flex gap-2">
+            {currentUserRole === USER_ROLES.TEST_CENTER_OWNER && (
+              <Button
+                variant={showExcelImport ? "secondary" : "outline"}
+                size="sm"
+                onClick={() => setShowExcelImport((v) => !v)}
+              >
+                <FileText className="h-4 w-4 mr-2" />
+                {showExcelImport ? "Hide Import" : "Excel Import"}
               </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-6xl max-h-[95vh] overflow-y-auto bg-white border-2 border-gray-200 shadow-2xl">
-              <DialogHeader>
-                <DialogTitle>Create New Question</DialogTitle>
-                <DialogDescription>
-                  Add a new question to the {subject.name} question bank.
-                </DialogDescription>
-              </DialogHeader>
-              <QuestionForm
-                formData={formData}
-                setFormData={setFormData}
-                onSubmit={handleCreateQuestion}
-                onCancel={() => setIsCreateDialogOpen(false)}
-                addAnswer={addAnswer}
-                updateAnswer={updateAnswer}
-                removeAnswer={removeAnswer}
-                formValidationError={formValidationError}
-                tempMedia={tempMedia}
-                mediaProgress={mediaProgress}
-                mediaUploading={mediaUploading}
-                mediaError={mediaError}
-                onSelectMedia={handleSelectMedia}
-                isEditing={false}
-              />
-            </DialogContent>
-          </Dialog>
+            )}
+            <Dialog
+              open={isCreateDialogOpen}
+              onOpenChange={setIsCreateDialogOpen}
+            >
+              <DialogTrigger asChild>
+                <Button onClick={resetForm}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Question
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-6xl max-h-[95vh] overflow-y-auto bg-white border-2 border-gray-200 shadow-2xl">
+                <DialogHeader>
+                  <DialogTitle>Create New Question</DialogTitle>
+                  <DialogDescription>
+                    Add a new question to the {subject.name} question bank.
+                  </DialogDescription>
+                </DialogHeader>
+                <QuestionForm
+                  formData={formData}
+                  setFormData={setFormData}
+                  onSubmit={handleCreateQuestion}
+                  onCancel={() => setIsCreateDialogOpen(false)}
+                  addAnswer={addAnswer}
+                  updateAnswer={updateAnswer}
+                  removeAnswer={removeAnswer}
+                  formValidationError={formValidationError}
+                  tempMedia={tempMedia}
+                  mediaProgress={mediaProgress}
+                  mediaUploading={mediaUploading}
+                  mediaError={mediaError}
+                  onSelectMedia={handleSelectMedia}
+                  isEditing={false}
+                />
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
+
+        {showExcelImport && (
+          <div className="mb-6">
+            <ExcelImportPanel
+              subjectCode={subject.code}
+              currentUserRole={currentUserRole || undefined}
+              onImported={() => {
+                fetchSubjectAndQuestions();
+              }}
+              onClose={() => setShowExcelImport(false)}
+            />
+          </div>
+        )}
 
         {/* Stats Cards */}
         <QuestionStats questions={questions} />

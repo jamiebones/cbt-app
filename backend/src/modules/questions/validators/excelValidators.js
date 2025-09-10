@@ -5,13 +5,12 @@ import { Question } from '../../../models/index.js';
 export const excelImportSchema = Joi.object({
     subjectCode: Joi.string()
         .required()
+        .trim()
         .min(1)
-        .max(20)
-        .pattern(/^[A-Z0-9_]+$/)
+        .max(50) 
         .messages({
             'string.empty': 'Subject code is required',
-            'string.pattern.base': 'Subject code can only contain uppercase letters, numbers, and underscores',
-            'string.max': 'Subject code cannot exceed 20 characters'
+            'string.max': 'Subject code cannot exceed 50 characters'
         })
 });
 
@@ -19,12 +18,11 @@ export const excelImportSchema = Joi.object({
 export const previewImportSchema = Joi.object({
     subjectCode: Joi.string()
         .required()
+        .trim()
         .min(1)
-        .max(20)
-        .pattern(/^[A-Z0-9_]+$/)
+        .max(50)
         .messages({
-            'string.empty': 'Subject code is required',
-            'string.pattern.base': 'Subject code can only contain uppercase letters, numbers, and underscores'
+            'string.empty': 'Subject code is required'
         }),
     maxRows: Joi.number()
         .optional()
@@ -143,9 +141,9 @@ export const questionDataSchema = Joi.object({
 export const bulkImportOptionsSchema = Joi.object({
     subjectCode: Joi.string()
         .required()
+        .trim()
         .min(1)
-        .max(20)
-        .pattern(/^[A-Z0-9_]+$/),
+        .max(50),
 
     batchSize: Joi.number()
         .optional()

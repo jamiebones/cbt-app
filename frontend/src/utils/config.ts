@@ -71,7 +71,10 @@ export const API_ENDPOINTS = {
   
   // Questions
   QUESTIONS: '/api/questions',
-  QUESTION_IMPORT: '/api/questions/import',
+  QUESTIONS_BULK_IMPORT: '/api/questions/bulk-import',
+  QUESTIONS_BULK_IMPORT_PREVIEW: '/api/questions/bulk-import/preview',
+  QUESTIONS_BULK_IMPORT_TEMPLATE: '/api/questions/bulk-import/template',
+  QUESTIONS_BULK_IMPORT_STATUS: (batchId: string) => `/api/questions/bulk-import/status/${batchId}`,
   
   // Subjects
   SUBJECTS: '/api/subjects',

@@ -251,8 +251,7 @@ const QuestionForm: React.FC<QuestionFormProps> = ({
         </div>
       </div>
 
-      <img src="http://localhost:4000/uploads/images/1757498781484_f7d4a34eec3c8169.jpg"/>
-
+      
       {/* Media Upload Section */}
       <div className="space-y-6">
         <Label className="text-base font-medium">Media (Optional)</Label>

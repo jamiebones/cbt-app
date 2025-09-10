@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { questionController } from './controller.js';
 import { authenticate } from '../auth/middleware.js';
+import { authorize } from '../../middleware/authorize.js';
 
 const router = Router();
 
@@ -25,17 +26,17 @@ router.post('/auto-select', questionController.autoSelectQuestions);
 // POST /api/questions/auto-select/preview - Preview auto-selection
 router.post('/auto-select/preview', questionController.previewAutoSelection);
 
-// POST /api/questions/bulk-import - Bulk import questions from Excel
-router.post('/bulk-import', questionController.upload.single('excelFile'), questionController.bulkImportQuestions);
+// POST /api/questions/bulk-import - Bulk import questions from Excel (owner only)
+router.post('/bulk-import', authorize('test_center_owner'), questionController.upload.single('excelFile'), questionController.bulkImportQuestions);
 
-// POST /api/questions/bulk-import/preview - Preview Excel import
-router.post('/bulk-import/preview', questionController.upload.single('excelFile'), questionController.previewExcelImport);
+// POST /api/questions/bulk-import/preview - Preview Excel import (owner only)
+router.post('/bulk-import/preview', authorize('test_center_owner'), questionController.upload.single('excelFile'), questionController.previewExcelImport);
 
-// GET /api/questions/bulk-import/template - Download Excel template
-router.get('/bulk-import/template', questionController.downloadExcelTemplate);
+// GET /api/questions/bulk-import/template - Download Excel template (owner only)
+router.get('/bulk-import/template', authorize('test_center_owner'), questionController.downloadExcelTemplate);
 
-// GET /api/questions/bulk-import/status/:batchId - Get import batch status  
-router.get('/bulk-import/status/:batchId', questionController.getImportBatchStatus);
+// GET /api/questions/bulk-import/status/:batchId - Get import batch status (owner only)
+router.get('/bulk-import/status/:batchId', authorize('test_center_owner'), questionController.getImportBatchStatus);
 
 // GET /api/questions/:id - Get a specific question by ID
 router.get('/:id', questionController.getQuestionById);
