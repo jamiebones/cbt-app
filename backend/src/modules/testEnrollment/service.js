@@ -17,6 +17,11 @@ class TestEnrollmentService {
                 throw new Error('Test not found');
             }
 
+            // Only allow enrollment for ACTIVE tests in lifecycle
+            if (test.status !== 'active') {
+                throw new Error('Only active tests are open for enrollment');
+            }
+
             if (!test.enrollmentConfig.isEnrollmentRequired) {
                 throw new Error('This test does not require enrollment');
             }
@@ -47,6 +52,14 @@ class TestEnrollmentService {
                 throw new Error('Valid student account required');
             }
 
+            // Ensure student belongs to the same test center as the test
+            if (!student.testCenterOwner || student.testCenterOwner.toString() !== test.testCenterOwner.toString()) {
+                throw new Error('You can only enroll for tests in your center');
+            }
+
+            // Determine payment amount early (used in pending-enrollment flow below)
+            const paymentAmount = test.enrollmentConfig.enrollmentFee || 0;
+
             // Check for existing enrollment
             const existingEnrollment = await TestEnrollment.findOne({
                 test: testId,
@@ -57,16 +70,46 @@ class TestEnrollmentService {
                 if (existingEnrollment.enrollmentStatus === 'enrolled') {
                     throw new Error('Student is already enrolled for this test');
                 }
+
                 if (existingEnrollment.enrollmentStatus === 'payment_pending') {
-                    throw new Error('Student has pending enrollment payment');
+                    // If there is a pending enrollment, ensure there is a transaction to continue payment
+                    let paymentData = null;
+                    if (!existingEnrollment.transactionId && paymentAmount > 0 && test.enrollmentConfig.requirePayment) {
+                        paymentData = await paymentService.initializePayment(
+                            paymentAmount,
+                            'NGN',
+                            {
+                                enrollmentId: existingEnrollment._id,
+                                testId,
+                                studentId,
+                                type: 'test_enrollment'
+                            }
+                        );
+                        existingEnrollment.transactionId = paymentData.transactionId;
+                        existingEnrollment.paymentReference = paymentData.transactionId;
+                        await existingEnrollment.save();
+                    } else if (paymentAmount > 0 && test.enrollmentConfig.requirePayment) {
+                        paymentData = {
+                            transactionId: existingEnrollment.transactionId,
+                            status: 'pending',
+                            amount: paymentAmount,
+                            currency: 'NGN',
+                        };
+                    }
+
+                    await existingEnrollment.populate([
+                        { path: 'test', select: 'title description duration enrollmentConfig' },
+                        { path: 'student', select: 'firstName lastName email studentRegNumber' }
+                    ]);
+
+                    return { enrollment: existingEnrollment, paymentData };
                 }
             }
 
             // Generate unique access code
             const accessCode = await this.generateUniqueAccessCode();
 
-            // Determine payment amount
-            const paymentAmount = test.enrollmentConfig.enrollmentFee || 0;
+            // paymentAmount already determined above
 
             // Create enrollment
             const enrollment = new TestEnrollment({
@@ -133,6 +176,11 @@ class TestEnrollmentService {
             if (!enrollment) {
                 throw new Error('Enrollment not found');
             }
+
+            // Ensure the related test is still active and belongs to same center as student
+            const test = await Test.findById(enrollment.test);
+            if (!test) throw new Error('Associated test not found');
+            if (test.status !== 'active') throw new Error('Test is not open for enrollment');
 
             if (enrollment.paymentStatus === 'completed') {
                 throw new Error('Payment already completed');

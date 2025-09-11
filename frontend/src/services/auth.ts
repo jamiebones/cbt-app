@@ -8,6 +8,13 @@ export interface AuthResponse {
   refreshToken: string;
 }
 
+export interface CenterOption {
+  id: string;
+  testCenterName: string;
+  contactName?: string;
+  email?: string;
+}
+
 class AuthService {
   // Login user
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
@@ -21,6 +28,16 @@ class AuthService {
       };
       this.storeAuthData(authData);
       return authData;
+    } catch (error: any) {
+      throw new Error(handleApiError(error));
+    }
+  }
+
+  // Public: fetch available test centers for student signup
+  async listCenters(): Promise<CenterOption[]> {
+    try {
+      const response = await mainApi.get<ApiResponse<CenterOption[]>>("/api/auth/centers");
+      return handleApiResponse(response);
     } catch (error: any) {
       throw new Error(handleApiError(error));
     }

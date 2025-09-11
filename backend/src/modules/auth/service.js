@@ -184,8 +184,8 @@ class AuthService {
             }
 
             // Check student ID uniqueness for students
-            if (userData.role === USER_ROLES.STUDENT && userData.studentId) {
-                const existingStudent = await User.findOne({ studentId: userData.studentId });
+            if (userData.role === USER_ROLES.STUDENT && userData.studentRegNumber) {
+                const existingStudent = await User.findOne({ studentRegNumber: userData.studentRegNumber });
                 if (existingStudent) {
                     throw new Error('Student ID already exists');
                 }
@@ -515,7 +515,7 @@ class AuthService {
         }
 
         if (role === USER_ROLES.STUDENT) {
-            if (!userData.studentId) {
+            if (!userData.studentRegNumber) {
                 throw new Error('Student ID is required for students');
             }
             if (!userData.testCenterOwner) {
@@ -576,6 +576,22 @@ class AuthService {
         }
 
         return user.subscriptionLimits?.[limitKey] || false;
+    }
+
+    // Public: list active test centers for student signup
+    async listCenters() {
+        logger.info('Listing active test centers');
+        const owners = await User.find({ role: USER_ROLES.TEST_CENTER_OWNER, isActive: true })
+            .select('testCenterName firstName lastName email')
+            .sort({ testCenterName: 1 })
+            .lean();
+
+        return owners.map(o => ({
+            id: o._id?.toString?.() || o.id,
+            testCenterName: o.testCenterName || `${o.firstName} ${o.lastName}`,
+            contactName: `${o.firstName || ''} ${o.lastName || ''}`.trim(),
+            email: o.email
+        }));
     }
 }
 

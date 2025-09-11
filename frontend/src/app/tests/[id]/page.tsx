@@ -227,14 +227,19 @@ const TestViewPage = () => {
               <p className="text-gray-600 mt-1">Test Details</p>
             </div>
           </div>
-          <div className="flex gap-2">
-            <Link href={`/tests/${testId}/edit`}>
-              <Button variant="outline">
-                <Edit className="h-4 w-4 mr-2" />
-                Edit Test
-              </Button>
-            </Link>
-          </div>
+          <ProtectedRoute
+            requiredAuth={true}
+            requiredRoles={["test_center_owner", "test_creator"]}
+          >
+            <div className="flex gap-2">
+              <Link href={`/tests/${testId}/edit`}>
+                <Button variant="outline">
+                  <Edit className="h-4 w-4 mr-2" />
+                  Edit Test
+                </Button>
+              </Link>
+            </div>
+          </ProtectedRoute>
         </div>
 
         {/* Success Banner */}
@@ -556,101 +561,118 @@ const TestViewPage = () => {
                 <CardTitle>Actions</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
-                <Link
-                  href={`/tests/${testId}/manage-questions`}
-                  className="w-full"
+                <ProtectedRoute
+                  requiredAuth={true}
+                  requiredRoles={["test_center_owner", "test_creator"]}
                 >
-                  <Button variant="default" className="w-full">
-                    <BookOpen className="h-4 w-4 mr-2" />
-                    Manage Questions
-                  </Button>
-                </Link>
-                <Link href={`/tests/${testId}/edit`} className="w-full">
-                  <Button variant="outline" className="w-full">
-                    <Edit className="h-4 w-4 mr-2" />
-                    Edit Test
-                  </Button>
-                </Link>
+                  <Link
+                    href={`/tests/${testId}/manage-questions`}
+                    className="w-full"
+                  >
+                    <Button variant="default" className="w-full">
+                      <BookOpen className="h-4 w-4 mr-2" />
+                      Manage Questions
+                    </Button>
+                  </Link>
+                  <Link href={`/tests/${testId}/edit`} className="w-full">
+                    <Button variant="outline" className="w-full">
+                      <Edit className="h-4 w-4 mr-2" />
+                      Edit Test
+                    </Button>
+                  </Link>
+                </ProtectedRoute>
                 <Button variant="outline" className="w-full">
                   <BarChart3 className="h-4 w-4 mr-2" />
                   View Results
                 </Button>
 
                 {/* Change Status */}
-                <Dialog open={statusOpen} onOpenChange={setStatusOpen}>
-                  <DialogTrigger asChild>
-                    <Button
-                      variant="default"
-                      className="w-full"
-                      disabled={!getNextStatus(test.status)}
-                    >
-                      Change Status
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                    <DialogHeader>
-                      <DialogTitle>Change Test Status</DialogTitle>
-                      <DialogDescription>
-                        Transition the test to the next stage in its lifecycle.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-3">
-                        {getStatusBadge(test.status)}
-                        <span className="text-gray-500">→</span>
-                        {getNextStatus(test.status) ? (
-                          getStatusBadge(getNextStatus(test.status) as string)
-                        ) : (
-                          <Badge variant="outline">No further transition</Badge>
-                        )}
-                      </div>
-
-                      {statusError && (
-                        <Alert variant="destructive">
-                          <AlertDescription>{statusError}</AlertDescription>
-                        </Alert>
-                      )}
-
-                      <div className="text-sm text-gray-600 space-y-1">
-                        {test.status === "draft" && (
-                          <p>
-                            To publish, ensure the number of questions equals
-                            the test's total questions.
-                          </p>
-                        )}
-                        {test.status === "published" && (
-                          <p>
-                            To activate, current time must be within the test's
-                            scheduled start and end time.
-                          </p>
-                        )}
-                        {test.status === "active" && (
-                          <p>Completing will close the test to new attempts.</p>
-                        )}
-                        {test.status === "completed" && (
-                          <p>
-                            Archiving will move the test out of active lists.
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    <DialogFooter>
+                <ProtectedRoute
+                  requiredAuth={true}
+                  requiredRoles={["test_center_owner", "test_creator"]}
+                >
+                  <Dialog open={statusOpen} onOpenChange={setStatusOpen}>
+                    <DialogTrigger asChild>
                       <Button
-                        variant="outline"
-                        onClick={() => setStatusOpen(false)}
-                        disabled={statusLoading}
+                        variant="default"
+                        className="w-full"
+                        disabled={!getNextStatus(test.status)}
                       >
-                        Cancel
+                        Change Status
                       </Button>
-                      <Button
-                        onClick={handleChangeStatus}
-                        disabled={!getNextStatus(test.status) || statusLoading}
-                      >
-                        {statusLoading ? "Updating..." : "Confirm"}
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Change Test Status</DialogTitle>
+                        <DialogDescription>
+                          Transition the test to the next stage in its
+                          lifecycle.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        <div className="flex items-center gap-3">
+                          {getStatusBadge(test.status)}
+                          <span className="text-gray-500">→</span>
+                          {getNextStatus(test.status) ? (
+                            getStatusBadge(getNextStatus(test.status) as string)
+                          ) : (
+                            <Badge variant="outline">
+                              No further transition
+                            </Badge>
+                          )}
+                        </div>
+
+                        {statusError && (
+                          <Alert variant="destructive">
+                            <AlertDescription>{statusError}</AlertDescription>
+                          </Alert>
+                        )}
+
+                        <div className="text-sm text-gray-600 space-y-1">
+                          {test.status === "draft" && (
+                            <p>
+                              To publish, ensure the number of questions equals
+                              the test's total questions.
+                            </p>
+                          )}
+                          {test.status === "published" && (
+                            <p>
+                              To activate, current time must be within the
+                              test's scheduled start and end time.
+                            </p>
+                          )}
+                          {test.status === "active" && (
+                            <p>
+                              Completing will close the test to new attempts.
+                            </p>
+                          )}
+                          {test.status === "completed" && (
+                            <p>
+                              Archiving will move the test out of active lists.
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      <DialogFooter>
+                        <Button
+                          variant="outline"
+                          onClick={() => setStatusOpen(false)}
+                          disabled={statusLoading}
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          onClick={handleChangeStatus}
+                          disabled={
+                            !getNextStatus(test.status) || statusLoading
+                          }
+                        >
+                          {statusLoading ? "Updating..." : "Confirm"}
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                </ProtectedRoute>
               </CardContent>
             </Card>
           </div>

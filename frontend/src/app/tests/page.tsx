@@ -80,12 +80,17 @@ const TestsPage = () => {
             <h1 className="text-3xl font-bold text-gray-900">Tests</h1>
             <p className="text-gray-600 mt-2">Manage your test assessments</p>
           </div>
-          <Link href="/tests/create">
-            <Button className="flex items-center gap-2">
-              <Plus className="h-4 w-4" />
-              Create Test
-            </Button>
-          </Link>
+          <ProtectedRoute
+            requiredAuth={true}
+            requiredRoles={["test_center_owner", "test_creator"]}
+          >
+            <Link href="/tests/create">
+              <Button className="flex items-center gap-2">
+                <Plus className="h-4 w-4" />
+                Create Test
+              </Button>
+            </Link>
+          </ProtectedRoute>
         </div>
 
         {error && (
@@ -104,12 +109,17 @@ const TestsPage = () => {
               <p className="text-gray-500 text-center mb-4">
                 Get started by creating your first test assessment.
               </p>
-              <Link href="/tests/create">
-                <Button>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create Your First Test
-                </Button>
-              </Link>
+              <ProtectedRoute
+                requiredAuth={true}
+                requiredRoles={["test_center_owner", "test_creator"]}
+              >
+                <Link href="/tests/create">
+                  <Button>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Your First Test
+                  </Button>
+                </Link>
+              </ProtectedRoute>
             </CardContent>
           </Card>
         ) : (

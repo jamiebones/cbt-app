@@ -68,6 +68,7 @@ export const API_ENDPOINTS = {
   // Tests
   TESTS: '/api/tests',
   TEST_UPDATE_STATUS: (testId: string) => `/api/tests/${testId}/status`,
+  TESTS_ACTIVE_MY_CENTER: '/api/tests/active/my-center',
   TEST_SESSIONS: '/api/tests/sessions',
   TEST_QUESTIONS_MANUAL: (testId: string) => `/api/tests/${testId}/questions/manual`,
   TEST_QUESTIONS_AUTO: (testId: string) => `/api/tests/${testId}/questions/auto`,
@@ -96,6 +97,11 @@ export const API_ENDPOINTS = {
   // Analytics
   ANALYTICS: '/api/analytics',
   REPORTS: '/api/analytics/reports',
+
+  // Test Enrollments
+  TEST_ENROLL: '/api/test-enrollments/enroll',
+  TEST_ENROLLMENT_PAY: (enrollmentId: string) => `/api/test-enrollments/${enrollmentId}/pay`,
+  MY_ENROLLMENTS: '/api/test-enrollments/my-enrollments',
   
   // Health
   HEALTH: '/api/health',

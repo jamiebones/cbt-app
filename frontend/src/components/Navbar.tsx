@@ -82,6 +82,12 @@ const Navbar: React.FC = () => {
                   >
                     Register
                   </Link>
+                  <Link
+                    href="/register/student"
+                    className="bg-green-600 text-white px-3 py-2 rounded-md text-sm font-medium hover:bg-green-700"
+                  >
+                    Student Signup
+                  </Link>
                 </>
               )}
             </div>

@@ -209,6 +209,18 @@ class AuthController {
             });
         }
     };
+
+    // Public: List available test centers for signup
+    listCenters = async (req, res) => {
+        try {
+            this.logger.info('Auth list centers endpoint called');
+            const centers = await this.authService.listCenters();
+            res.json({ success: true, data: centers });
+        } catch (error) {
+            this.logger.error('List centers failed:', error);
+            res.status(500).json({ success: false, message: error.message || 'Failed to list centers' });
+        }
+    };
 }
 
 const authController = new AuthController();

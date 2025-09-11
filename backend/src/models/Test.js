@@ -478,12 +478,11 @@ testSchema.statics.findByOwner = function (ownerId, options = {}) {
 };
 
 testSchema.statics.findActiveTests = function (ownerId) {
-    const now = new Date();
+    // Return tests explicitly marked as active for the given test center owner
+    // Status transitions ensure time window validity at activation
     return this.find({
         testCenterOwner: ownerId,
-        status: 'published',
-        'schedule.startDate': { $lte: now },
-        'schedule.endDate': { $gte: now }
+        status: 'active'
     }).populate('subject', 'name');
 };
 

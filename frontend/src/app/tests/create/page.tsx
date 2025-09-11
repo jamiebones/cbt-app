@@ -195,7 +195,10 @@ const CreateTestPage = () => {
   };
 
   return (
-    <ProtectedRoute requiredAuth={true}>
+    <ProtectedRoute
+      requiredAuth={true}
+      requiredRoles={["test_center_owner", "test_creator"]}
+    >
       <div className="container mx-auto px-4 py-8 max-w-4xl">
         <div className="flex items-center gap-4 mb-6">
           <Link href="/tests">

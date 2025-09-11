@@ -608,7 +608,7 @@ class TestService {
 
         // Helper validations
         const hasValidQuestions = () => {
-            if ( test.questions?.length < test.totalQuestions ) {
+            if (test.questions?.length < test.totalQuestions) {
                 return false;
             }
             return true;
@@ -657,6 +657,19 @@ class TestService {
         test.status = newStatus;
         await test.save();
         return { success: true, status: test.status };
+    }
+
+    // List active tests for a student by their test center owner
+    async listActiveTestsForOwner(ownerId) {
+        try {
+            const tests = await Test.findActiveTests(ownerId)
+                .select('title description duration totalQuestions subject schedule status enrollmentConfig enrollmentStats createdAt')
+                .lean();
+            return tests;
+        } catch (error) {
+            this.logger.error('Failed to list active tests:', error);
+            throw error;
+        }
     }
 }
 

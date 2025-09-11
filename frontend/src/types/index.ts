@@ -40,7 +40,14 @@ export interface RegisterData {
   email: string;
   password: string;
   confirmPassword: string;
+  // Owner registration optional field
   testCenterName?: string;
+  // Student-specific optional fields (used by student signup)
+  role?: 'student' | 'test_center_owner' | 'test_creator' | 'super_admin';
+  firstName?: string;
+  lastName?: string;
+  studentRegNumber?: string;
+  testCenterOwner?: string;
 }
 
 // Test and Question Types

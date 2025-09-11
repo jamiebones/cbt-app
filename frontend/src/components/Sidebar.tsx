@@ -13,6 +13,7 @@ import {
   BarChart2,
   Settings,
   HelpCircle,
+  ComputerIcon,
 } from "lucide-react";
 import { USER_ROLES } from "@/utils/config";
 
@@ -124,6 +125,11 @@ const Sidebar: React.FC = () => {
       case USER_ROLES.STUDENT:
         return [
           ...baseLinks,
+          {
+            href: "/dashboard/active-tests",
+            icon: <ComputerIcon className="h-5 w-5" />,
+            label: "Register for Exams",
+          },
           {
             href: "/my-results",
             icon: <BarChart2 className="h-5 w-5" />,

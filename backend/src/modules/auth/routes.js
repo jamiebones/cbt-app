@@ -15,6 +15,8 @@ router.post('/register', registrationRateLimiter, authController.register);
 router.post('/login', loginRateLimiter, authController.login);
 router.post('/request-password-reset', passwordResetRateLimiter, authController.requestPasswordReset);
 router.post('/reset-password', passwordResetRateLimiter, authController.resetPassword);
+// Public: list available test centers for student signup
+router.get('/centers', authController.listCenters);
 
 // Protected routes (require authentication)
 router.use(authenticate);

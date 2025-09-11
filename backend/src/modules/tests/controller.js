@@ -64,6 +64,26 @@ class TestController {
         }
     };
 
+    // List active tests available for a student in their center
+    getActiveTestsForStudent = async (req, res) => {
+        try {
+            if (req.user.role !== 'student') {
+                return res.status(403).json({ success: false, message: 'Only students can access active tests list' });
+            }
+            const ownerId = req.user.testCenterOwner;
+            if (!ownerId) {
+                return res.status(400).json({ success: false, message: 'Student is not associated with a test center' });
+            }
+
+            const tests = await this.testService.listActiveTestsForOwner(ownerId);
+
+            res.status(200).json({ success: true, data: tests });
+        } catch (error) {
+            logger.error('Get active tests for student error:', error);
+            res.status(400).json({ success: false, message: error.message || 'Failed to fetch active tests' });
+        }
+    };
+
     // Create a new test
     createTest = async (req, res) => {
         try {
