@@ -1,6 +1,7 @@
 import { Test, Question, Subject, User, TestEnrollment } from '../../models/index.js';
 import { subscriptionService } from '../subscriptions/service.js';
 import { logger } from '../../config/logger.js';
+import mongoose from 'mongoose';
 
 class TestService {
     constructor() {
@@ -451,6 +452,211 @@ class TestService {
             this.logger.error('Failed to update enrollment config:', error);
             throw error;
         }
+    }
+
+    // Bulk add existing questions manually
+    async addExistingQuestions(testId, questionIds, ownerId, userId) {
+        this.logger.info(`Bulk adding ${questionIds.length} questions to test ${testId}`);
+        const test = await Test.findOne({ _id: testId, testCenterOwner: ownerId });
+        if (!test) throw new Error('Test not found or access denied');
+        if (['active', 'completed'].includes(test.status)) throw new Error('Cannot modify questions in active or completed tests');
+
+        // Filter to questions belonging to same owner & active
+        const questions = await Question.find({
+            _id: { $in: questionIds },
+            testCenterOwner: ownerId,
+            isActive: true
+        }).select('_id');
+
+        const validIds = questions.map(q => q._id.toString());
+        const existingSet = new Set(test.questions.map(id => id.toString()));
+        const newIds = validIds.filter(id => !existingSet.has(id));
+
+        if (!newIds.length) {
+            return { added: 0, totalInTest: test.questions.length, addedIds: [] };
+        }
+
+        test.questions.push(...newIds.map(id => new mongoose.Types.ObjectId(id)));
+        await test.save();
+        return { added: newIds.length, totalInTest: test.questions.length, addedIds: newIds };
+    }
+
+    // Auto select random questions based on criteria
+    async autoSelectQuestions(testId, params, ownerId) {
+        const { subjects, count, difficultyDistribution } = params;
+        this.logger.info(`Auto selecting ${count} questions for test ${testId}`);
+        const test = await Test.findOne({ _id: testId, testCenterOwner: ownerId });
+        if (!test) throw new Error('Test not found or access denied');
+        if (['active', 'completed'].includes(test.status)) throw new Error('Cannot modify questions in active or completed tests');
+
+        const excludeIds = test.questions;
+        const baseMatch = {
+            subject: { $in: subjects.map(id => new mongoose.Types.ObjectId(id)) },
+            testCenterOwner: new mongoose.Types.ObjectId(ownerId),
+            isActive: true,
+            _id: { $nin: excludeIds }
+        };
+
+        // Difficulty distribution if provided and sums to 100
+        if (difficultyDistribution && Object.values(difficultyDistribution).some(v => v > 0)) {
+            const totalReq = count;
+            const dist = difficultyDistribution;
+            const segments = ['easy', 'medium', 'hard'].map(level => ({ level, pct: dist[level] || 0 }));
+            const samples = [];
+            for (const seg of segments) {
+                if (seg.pct > 0) {
+                    const size = Math.round((seg.pct / 100) * totalReq);
+                    if (size > 0) {
+                        samples.push({ level: seg.level, size });
+                    }
+                }
+            }
+            // Fallback if rounding dropped all
+            if (!samples.length) samples.push({ level: 'medium', size: totalReq });
+
+            const results = [];
+            for (const s of samples) {
+                const part = await Question.aggregate([
+                    { $match: { ...baseMatch, difficulty: s.level } },
+                    { $sample: { size: s.size } }
+                ]);
+                results.push(...part);
+            }
+            // If still short, fill randomly
+            if (results.length < count) {
+                const remaining = count - results.length;
+                const fill = await Question.aggregate([
+                    { $match: baseMatch },
+                    { $sample: { size: remaining } }
+                ]);
+                results.push(...fill);
+            }
+            const newIds = results.map(r => r._id.toString());
+            const existingSet = new Set(test.questions.map(id => id.toString()));
+            const filtered = newIds.filter(id => !existingSet.has(id));
+            test.questions.push(...filtered.map(id => new mongoose.Types.ObjectId(id)));
+            await test.save();
+            return { requested: count, added: filtered.length, totalInTest: test.questions.length, addedIds: filtered };
+        }
+
+        // Simple random sample
+        const sampled = await Question.aggregate([
+            { $match: baseMatch },
+            { $sample: { size: count } }
+        ]);
+        const ids = sampled.map(q => q._id.toString());
+        const existingSet = new Set(test.questions.map(id => id.toString()));
+        const newIds = ids.filter(id => !existingSet.has(id));
+        test.questions.push(...newIds.map(id => new mongoose.Types.ObjectId(id)));
+        await test.save();
+        return { requested: count, added: newIds.length, totalInTest: test.questions.length, addedIds: newIds };
+    }
+
+    // Attach imported question IDs after excel import
+    async attachImportedQuestions(testId, questionIds, ownerId) {
+        const test = await Test.findOne({ _id: testId, testCenterOwner: ownerId });
+        if (!test) throw new Error('Test not found or access denied');
+        if (!questionIds.length) return { added: 0, totalInTest: test.questions.length };
+        const existingSet = new Set(test.questions.map(id => id.toString()));
+        const newIds = questionIds.filter(id => !existingSet.has(id));
+        if (!newIds.length) return { added: 0, totalInTest: test.questions.length };
+        test.questions.push(...newIds.map(id => new mongoose.Types.ObjectId(id)));
+        await test.save();
+        return { added: newIds.length, totalInTest: test.questions.length, addedIds: newIds };
+    }
+
+    // Remove a single question from a test
+    async removeQuestionFromTest(testId, questionId, ownerId) {
+        this.logger.info(`Removing question ${questionId} from test ${testId}`);
+        const test = await Test.findOne({ _id: testId, testCenterOwner: ownerId }).select('_id status questions');
+        if (!test) throw new Error('Test not found or access denied');
+        if (['active', 'completed'].includes(test.status)) {
+            throw new Error('Cannot modify questions in active or completed tests');
+        }
+
+        const qId = new mongoose.Types.ObjectId(questionId);
+        const exists = (test.questions || []).some(id => id.toString() === qId.toString());
+        if (!exists) {
+            return { removed: 0, totalInTest: test.questions.length, message: 'Question not in test' };
+        }
+
+        await Test.updateOne({ _id: testId }, { $pull: { questions: qId } });
+        const totalInTest = Math.max(0, (test.questions?.length || 1) - 1);
+        return { removed: 1, totalInTest, message: 'Question removed from test' };
+    }
+
+    // Update test status with business rules
+    async updateTestStatus(testId, ownerId, newStatus) {
+        this.logger.info(`Updating status for test ${testId} to ${newStatus}`);
+        const allowed = {
+            draft: ['published'],
+            published: ['active'],
+            active: ['completed'],
+            completed: ['archived'],
+            archived: []
+        };
+
+        const test = await Test.findOne({ _id: testId, testCenterOwner: ownerId }).select(
+            'status questions totalQuestions questionSelectionMethod autoSelectionConfig schedule.startDate schedule.endDate subject'
+        );
+        if (!test) throw new Error('Test not found or access denied');
+
+        const current = test.status;
+        if (!allowed[current] || !allowed[current].includes(newStatus)) {
+            throw new Error(`Invalid status transition from ${current} to ${newStatus}`);
+        }
+
+        // Helper validations
+        const hasValidQuestions = () => {
+            if ( test.questions?.length < test.totalQuestions ) {
+                return false;
+            }
+            return true;
+        };
+
+        const hasValidSchedule = () => {
+            const start = test.schedule?.startDate;
+            const end = test.schedule?.endDate;
+            return Boolean(start && end && start < end);
+        };
+
+        const nowWithinSchedule = () => {
+            const now = new Date();
+            const start = test.schedule?.startDate;
+            const end = test.schedule?.endDate;
+            return Boolean(start && end && start <= now && end >= now);
+        };
+
+        const scheduleEnded = () => {
+            const now = new Date();
+            const end = test.schedule?.endDate;
+            return Boolean(end && end <= now);
+        };
+
+        // Validate constraints per transition
+        if (current === 'draft' && newStatus === 'published') {
+            if (!test.subject) throw new Error('Cannot publish: subject is not set');
+            if (!hasValidSchedule()) throw new Error('Cannot publish: schedule is invalid');
+            if (!hasValidQuestions()) throw new Error('Cannot publish: questions are not complete');
+        }
+
+        if (current === 'published' && newStatus === 'active') {
+            if (!hasValidQuestions()) throw new Error('Cannot activate: questions are not complete');
+            if (!hasValidSchedule()) throw new Error('Cannot activate: schedule is invalid');
+            if (!nowWithinSchedule()) {
+                throw new Error('Cannot activate: current time is outside the scheduled window');
+            }
+        }
+
+        if (current === 'active' && newStatus === 'completed') {
+            if (!scheduleEnded()) {
+                throw new Error('Cannot complete: test has not reached its end time');
+            }
+        }
+
+        test.status = newStatus;
+        await test.save();
+        return { success: true, status: test.status };
     }
 }
 

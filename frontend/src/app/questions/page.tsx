@@ -13,6 +13,7 @@ import { USER_ROLES } from "@/utils/config";
 import { API_ENDPOINTS } from "@/utils/config";
 import { Search, Plus, BookOpen, FileText, BarChart3 } from "lucide-react";
 import { Subject, Question } from "@/types";
+import MathDisplay from "@/components/MathDisplay";
 
 interface QuestionWithSubject extends Question {
   subject?: Subject;
@@ -270,9 +271,13 @@ export default function QuestionBankPage() {
                         </Badge>
                       )}
                     </div>
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">
-                      {question.text}
-                    </h3>
+                    <div className="text-lg font-medium text-gray-900 mb-2">
+                      <MathDisplay
+                        content={
+                          question.questionText || (question as any).text || ""
+                        }
+                      />
+                    </div>
                     <div className="text-sm text-gray-600">
                       <p>{question.answers?.length || 0} answers</p>
                     </div>

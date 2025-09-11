@@ -119,6 +119,17 @@ class TestService {
     }
   }
 
+  // Update test status
+  async updateStatus(id: string, status: Test['status']): Promise<{ success: boolean; status: Test['status'] }>
+  {
+    try {
+      const response = await mainApi.patch(API_ENDPOINTS.TEST_UPDATE_STATUS(id), { status });
+      return response.data.data;
+    } catch (error) {
+      throw new Error(handleApiError(error));
+    }
+  }
+
   // Get subjects for test creation
   async getSubjects(): Promise<Subject[]> {
     try {

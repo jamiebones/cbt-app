@@ -1,5 +1,7 @@
 import { testService } from './service.js';
 import { logger } from '../../config/logger.js';
+import { manualAddSchema, autoAddSchema } from './validators.js';
+import { questionBankService } from '../questions/service.js';
 
 class TestController {
     constructor() {
@@ -145,6 +147,36 @@ class TestController {
         }
     };
 
+    // Update test status
+    updateStatus = async (req, res) => {
+        try {
+            const { id } = req.params;
+            const { status } = req.body;
+            const ownerId = req.user.role === 'test_center_owner'
+                ? req.user._id
+                : req.user.testCenterOwner;
+
+            if (!status) {
+                return res.status(400).json({ success: false, message: 'Status is required' });
+            }
+
+            const result = await this.testService.updateTestStatus(id, ownerId, status);
+
+            res.status(200).json({
+                success: true,
+                message: 'Test status updated successfully',
+                data: result
+            });
+        } catch (error) {
+            logger.error('Update status error:', error);
+            const statusCode = error.message.includes('not found') ? 404 : 400;
+            res.status(statusCode).json({
+                success: false,
+                message: error.message || 'Failed to update test status'
+            });
+        }
+    };
+
     // Get questions for a specific test
     getTestQuestions = async (req, res) => {
         try {
@@ -258,13 +290,56 @@ class TestController {
         }
     };
 
-    // Import questions from Excel (placeholder)
-    importFromExcel = async (req, res) => {
-        logger.info('Import from Excel endpoint called');
-        res.status(501).json({
-            success: false,
-            message: 'Excel import feature will be implemented in the next phase'
-        });
+    // Bulk add existing questions manually
+    addQuestionsManual = async (req, res) => {
+        try {
+            const { testId } = req.params;
+            const ownerId = req.user.role === 'test_center_owner' ? req.user._id : req.user.testCenterOwner;
+            const { error, value } = manualAddSchema.validate(req.body);
+            if (error) return res.status(400).json({ success: false, message: error.message });
+            const result = await this.testService.addExistingQuestions(testId, value.questionIds, ownerId, req.user._id);
+            res.status(200).json({ success: true, message: 'Questions added', data: result });
+        } catch (error) {
+            logger.error('Manual add questions error:', error);
+            res.status(400).json({ success: false, message: error.message });
+        }
+    };
+
+    // Auto add questions
+    addQuestionsAuto = async (req, res) => {
+        try {
+            const { testId } = req.params;
+            const ownerId = req.user.role === 'test_center_owner' ? req.user._id : req.user.testCenterOwner;
+            const { error, value } = autoAddSchema.validate(req.body);
+            if (error) return res.status(400).json({ success: false, message: error.message });
+            const result = await this.testService.autoSelectQuestions(testId, value, ownerId, req.user._id);
+            res.status(200).json({ success: true, message: 'Auto selection complete', data: result });
+        } catch (error) {
+            logger.error('Auto add questions error:', error);
+            res.status(400).json({ success: false, message: error.message });
+        }
+    };
+
+    // Import via existing excel service then attach
+    importQuestionsExcel = async (req, res) => {
+        try {
+            const { testId } = req.params;
+            const ownerId = req.user.role === 'test_center_owner' ? req.user._id : req.user.testCenterOwner;
+            if (!req.file) return res.status(400).json({ success: false, message: 'Excel file is required' });
+            const importResult = await questionBankService.importQuestionsFromExcel(
+                req.file.buffer,
+                req.body.subjectCode,
+                ownerId,
+                req.user._id,
+                { continueOnError: true, validateOnly: false }
+            );
+            const questionIds = importResult.results.filter(r => r.status === 'success' && r.questionId).map(r => r.questionId);
+            const attachResult = await this.testService.attachImportedQuestions(testId, questionIds, ownerId);
+            res.status(200).json({ success: true, message: 'Import complete', data: { importResult, attachResult } });
+        } catch (error) {
+            logger.error('Excel import attach error:', error);
+            res.status(400).json({ success: false, message: error.message });
+        }
     };
 
     // Get test with enrollment information

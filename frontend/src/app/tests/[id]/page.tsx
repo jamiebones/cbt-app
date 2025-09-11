@@ -13,6 +13,16 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Separator } from "@/components/ui/separator";
 import {
   ArrowLeft,
@@ -38,6 +48,10 @@ const TestViewPage = () => {
   const [test, setTest] = useState<Test | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [statusOpen, setStatusOpen] = useState(false);
+  const [statusLoading, setStatusLoading] = useState(false);
+  const [statusError, setStatusError] = useState<string | null>(null);
+  const [statusSuccess, setStatusSuccess] = useState<string | null>(null);
 
   const testId = params.id as string;
 
@@ -46,6 +60,13 @@ const TestViewPage = () => {
       fetchTest();
     }
   }, [testId]);
+
+  useEffect(() => {
+    if (statusSuccess) {
+      const t = setTimeout(() => setStatusSuccess(null), 3000);
+      return () => clearTimeout(t);
+    }
+  }, [statusSuccess]);
 
   const fetchTest = async () => {
     try {
@@ -97,6 +118,35 @@ const TestViewPage = () => {
     );
   };
 
+  const getNextStatus = (current: Test["status"]): Test["status"] | null => {
+    const map: Record<Test["status"], Test["status"] | null> = {
+      draft: "published",
+      published: "active",
+      active: "completed",
+      completed: "archived",
+      archived: null,
+    };
+    return map[current] ?? null;
+  };
+
+  const handleChangeStatus = async () => {
+    if (!test) return;
+    const next = getNextStatus(test.status);
+    if (!next) return;
+    try {
+      setStatusLoading(true);
+      setStatusError(null);
+      await testService.updateStatus(testId, next);
+      await fetchTest();
+      setStatusSuccess(`Status changed to ${next}`);
+      setStatusOpen(false);
+    } catch (e: any) {
+      setStatusError(e.message || "Failed to update status");
+    } finally {
+      setStatusLoading(false);
+    }
+  };
+
   const formatDuration = (minutes: number) => {
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
@@ -113,6 +163,8 @@ const TestViewPage = () => {
       day: "numeric",
       hour: "2-digit",
       minute: "2-digit",
+      timeZone: "UTC",
+      hour12: true,
     });
   };
 
@@ -184,6 +236,13 @@ const TestViewPage = () => {
             </Link>
           </div>
         </div>
+
+        {/* Success Banner */}
+        {statusSuccess && (
+          <Alert className="mb-4">
+            <AlertDescription>{statusSuccess}</AlertDescription>
+          </Alert>
+        )}
 
         {/* Status and Quick Info */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
@@ -302,7 +361,7 @@ const TestViewPage = () => {
                     <h4 className="font-medium text-gray-900 mb-1">
                       Start Date & Time
                     </h4>
-                    <p className="text-gray-600">
+                    <p className="text-gray-600" suppressHydrationWarning>
                       {formatDate(test.schedule.startDate)}
                     </p>
                   </div>
@@ -310,7 +369,7 @@ const TestViewPage = () => {
                     <h4 className="font-medium text-gray-900 mb-1">
                       End Date & Time
                     </h4>
-                    <p className="text-gray-600">
+                    <p className="text-gray-600" suppressHydrationWarning>
                       {formatDate(test.schedule.endDate)}
                     </p>
                   </div>
@@ -433,7 +492,7 @@ const TestViewPage = () => {
                     {test.enrollmentConfig.enrollmentDeadline && (
                       <div>
                         <p className="text-sm text-gray-600">Deadline</p>
-                        <p className="font-medium">
+                        <p className="font-medium" suppressHydrationWarning>
                           {formatDate(test.enrollmentConfig.enrollmentDeadline)}
                         </p>
                       </div>
@@ -497,6 +556,15 @@ const TestViewPage = () => {
                 <CardTitle>Actions</CardTitle>
               </CardHeader>
               <CardContent className="space-y-2">
+                <Link
+                  href={`/tests/${testId}/manage-questions`}
+                  className="w-full"
+                >
+                  <Button variant="default" className="w-full">
+                    <BookOpen className="h-4 w-4 mr-2" />
+                    Manage Questions
+                  </Button>
+                </Link>
                 <Link href={`/tests/${testId}/edit`} className="w-full">
                   <Button variant="outline" className="w-full">
                     <Edit className="h-4 w-4 mr-2" />
@@ -507,6 +575,82 @@ const TestViewPage = () => {
                   <BarChart3 className="h-4 w-4 mr-2" />
                   View Results
                 </Button>
+
+                {/* Change Status */}
+                <Dialog open={statusOpen} onOpenChange={setStatusOpen}>
+                  <DialogTrigger asChild>
+                    <Button
+                      variant="default"
+                      className="w-full"
+                      disabled={!getNextStatus(test.status)}
+                    >
+                      Change Status
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Change Test Status</DialogTitle>
+                      <DialogDescription>
+                        Transition the test to the next stage in its lifecycle.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-3">
+                        {getStatusBadge(test.status)}
+                        <span className="text-gray-500">→</span>
+                        {getNextStatus(test.status) ? (
+                          getStatusBadge(getNextStatus(test.status) as string)
+                        ) : (
+                          <Badge variant="outline">No further transition</Badge>
+                        )}
+                      </div>
+
+                      {statusError && (
+                        <Alert variant="destructive">
+                          <AlertDescription>{statusError}</AlertDescription>
+                        </Alert>
+                      )}
+
+                      <div className="text-sm text-gray-600 space-y-1">
+                        {test.status === "draft" && (
+                          <p>
+                            To publish, ensure the number of questions equals
+                            the test's total questions.
+                          </p>
+                        )}
+                        {test.status === "published" && (
+                          <p>
+                            To activate, current time must be within the test's
+                            scheduled start and end time.
+                          </p>
+                        )}
+                        {test.status === "active" && (
+                          <p>Completing will close the test to new attempts.</p>
+                        )}
+                        {test.status === "completed" && (
+                          <p>
+                            Archiving will move the test out of active lists.
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <DialogFooter>
+                      <Button
+                        variant="outline"
+                        onClick={() => setStatusOpen(false)}
+                        disabled={statusLoading}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        onClick={handleChangeStatus}
+                        disabled={!getNextStatus(test.status) || statusLoading}
+                      >
+                        {statusLoading ? "Updating..." : "Confirm"}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
               </CardContent>
             </Card>
           </div>

@@ -1,4 +1,5 @@
 "use client";
+import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { User } from "@/types";
@@ -18,8 +19,16 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
 }) => {
   const { state } = useAuth();
   const router = useRouter();
+  const [mounted, setMounted] = useState(false);
 
-  // Show spinner while loading or if state is not yet resolved
+  // Ensure we only render on the client to avoid SSR/CSR mismatch
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) return null;
+
+
   if (state.isLoading) {
     return <LoadingSpinner />;
   }

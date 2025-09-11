@@ -67,7 +67,13 @@ export const API_ENDPOINTS = {
 
   // Tests
   TESTS: '/api/tests',
+  TEST_UPDATE_STATUS: (testId: string) => `/api/tests/${testId}/status`,
   TEST_SESSIONS: '/api/tests/sessions',
+  TEST_QUESTIONS_MANUAL: (testId: string) => `/api/tests/${testId}/questions/manual`,
+  TEST_QUESTIONS_AUTO: (testId: string) => `/api/tests/${testId}/questions/auto`,
+  TEST_QUESTIONS_IMPORT_EXCEL: (testId: string) => `/api/tests/${testId}/questions/import-excel`,
+  TEST_GET_QUESTIONS: (testId: string) => `/api/tests/${testId}/questions`,
+  TEST_DELETE_QUESTION: (testId: string, questionId: string) => `/api/tests/${testId}/questions/${questionId}`,
   
   // Questions
   QUESTIONS: '/api/questions',
